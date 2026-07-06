@@ -1,0 +1,15 @@
+.env
+*.env
+!.env.example
+
+bin/
+tmp/
+dist/
+
+*.exe
+*.out
+*.test
+
+.DS_Store
+.idea/
+.vscode/

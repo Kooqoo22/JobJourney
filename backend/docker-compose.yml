@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: jobjourney-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-jobjourney}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-jobjourney}
+      POSTGRES_DB: ${DB_NAME:-jobjourney}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-jobjourney} -d ${DB_NAME:-jobjourney}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jobjourney-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_DEFAULT_TIMEZONE: ${APP_DEFAULT_TIMEZONE:-Asia/Jakarta}
+      SERVER_PORT: "8080"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-jobjourney}
+      DB_PASSWORD: ${DB_PASSWORD:-jobjourney}
+      DB_NAME: ${DB_NAME:-jobjourney}
+      DB_SSLMODE: disable
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-please}
+      JWT_ISSUER: ${JWT_ISSUER:-jobjourney}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-168h}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+
+volumes:
+  db_data:

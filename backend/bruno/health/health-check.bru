@@ -1,0 +1,23 @@
+meta {
+  name: Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{healthUrl}}/health
+  body: none
+  auth: none
+}
+
+docs {
+  ## Description
+  Liveness/readiness probe. Pings the database connection pool.
+
+  ## Responses
+  ### 200 OK
+  { "message": "service healthy", "data": { "status": "ok" } }
+
+  ### 503 Service Unavailable
+  { "message": "database unavailable" }
+}
