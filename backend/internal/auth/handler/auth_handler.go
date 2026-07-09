@@ -7,16 +7,15 @@ import (
 
 	"github.com/Kooqoo22/JobJourney/backend/internal/auth/dto"
 	"github.com/Kooqoo22/JobJourney/backend/internal/auth/mapper"
-	"github.com/Kooqoo22/JobJourney/backend/internal/auth/usecase"
 	"github.com/Kooqoo22/JobJourney/backend/internal/middleware"
 	"github.com/Kooqoo22/JobJourney/backend/pkg/utils"
 )
 
 type AuthHandler struct {
-	usecase *usecase.AuthUsecase
+	usecase AuthUsecaseIface
 }
 
-func NewAuthHandler(u *usecase.AuthUsecase) *AuthHandler {
+func NewAuthHandler(u AuthUsecaseIface) *AuthHandler {
 	return &AuthHandler{usecase: u}
 }
 
