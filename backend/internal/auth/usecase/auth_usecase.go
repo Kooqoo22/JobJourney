@@ -9,7 +9,6 @@ import (
 
 	"github.com/Kooqoo22/JobJourney/backend/internal/auth/dto"
 	"github.com/Kooqoo22/JobJourney/backend/internal/auth/entity"
-	"github.com/Kooqoo22/JobJourney/backend/internal/auth/repository"
 	"github.com/Kooqoo22/JobJourney/backend/internal/database"
 	"github.com/Kooqoo22/JobJourney/backend/pkg/mailer"
 	"github.com/Kooqoo22/JobJourney/backend/pkg/security"
@@ -20,9 +19,9 @@ import (
 const genericAuthMessage = "email or password is incorrect"
 
 type AuthUsecase struct {
-	userRepo    *repository.UserRepository
-	emailTokens *repository.EmailTokenRepository
-	refresh     *repository.RefreshTokenRepository
+	userRepo    UserRepoIface
+	emailTokens EmailTokenRepoIface
+	refresh     RefreshTokenRepoIface
 	tx          *database.TxManager
 	tokens      *token.Manager
 	mail        mailer.Mailer
@@ -34,9 +33,9 @@ type AuthUsecase struct {
 }
 
 type Deps struct {
-	UserRepo        *repository.UserRepository
-	EmailTokens     *repository.EmailTokenRepository
-	Refresh         *repository.RefreshTokenRepository
+	UserRepo        UserRepoIface
+	EmailTokens     EmailTokenRepoIface
+	Refresh         RefreshTokenRepoIface
 	Tx              *database.TxManager
 	Tokens          *token.Manager
 	Mailer          mailer.Mailer
