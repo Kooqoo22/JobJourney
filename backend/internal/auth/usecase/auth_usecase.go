@@ -46,13 +46,6 @@ type Deps struct {
 	ResetTokenTTL   time.Duration
 }
 
-type AuthResult struct {
-	User         entity.User
-	AccessToken  string
-	RefreshToken string
-	ExpiresIn    int64
-}
-
 func New(d Deps) *AuthUsecase {
 	return &AuthUsecase{
 		userRepo:        d.UserRepo,
@@ -214,73 +207,73 @@ func (u *AuthUsecase) ResendVerification(ctx context.Context, email string) erro
 	return nil
 }
 
-func (u *AuthUsecase) Login(ctx context.Context, req dto.LoginRequest) (AuthResult, error) {
+func (u *AuthUsecase) Login(ctx context.Context, req dto.LoginRequest) (*dto.AuthResult, error) {
 	user, err := u.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) {
-			return AuthResult{}, utils.ErrUnauthorized(genericAuthMessage)
+			return nil, utils.ErrUnauthorized(genericAuthMessage)
 		}
-		return AuthResult{}, utils.ErrInternal(err)
+		return nil, utils.ErrInternal(err)
 	}
 	if user.PasswordHash == nil || !security.CheckPassword(*user.PasswordHash, req.Password) {
-		return AuthResult{}, utils.ErrUnauthorized(genericAuthMessage)
+		return nil, utils.ErrUnauthorized(genericAuthMessage)
 	}
 	if user.IsBanned {
-		return AuthResult{}, utils.ErrForbidden("your account has been disabled")
+		return nil, utils.ErrForbidden("your account has been disabled")
 	}
 
 	result, err := u.issueSession(ctx, user, true)
 	if err != nil {
-		return AuthResult{}, err
+		return nil, err
 	}
 	return result, nil
 }
 
-func (u *AuthUsecase) Refresh(ctx context.Context, rawToken string) (AuthResult, error) {
+func (u *AuthUsecase) Refresh(ctx context.Context, rawToken string) (*dto.AuthResult, error) {
 	hash := security.HashToken(rawToken)
 
 	stored, err := u.refresh.GetByHash(ctx, hash)
 	if err != nil {
 		if errors.Is(err, entity.ErrRefreshTokenNotFound) {
-			return AuthResult{}, utils.ErrUnauthorized("invalid refresh token")
+			return nil, utils.ErrUnauthorized("invalid refresh token")
 		}
-		return AuthResult{}, utils.ErrInternal(err)
+		return nil, utils.ErrInternal(err)
 	}
 
 	if stored.RevokedAt != nil {
 		if rerr := u.refresh.RevokeAllByUser(ctx, stored.UserID); rerr != nil {
-			return AuthResult{}, utils.ErrInternal(rerr)
+			return nil, utils.ErrInternal(rerr)
 		}
-		return AuthResult{}, utils.ErrUnauthorized("refresh token has been revoked")
+		return nil, utils.ErrUnauthorized("refresh token has been revoked")
 	}
 	if stored.ExpiresAt.Before(time.Now().UTC()) {
 		if rerr := u.refresh.Revoke(ctx, stored.ID); rerr != nil {
-			return AuthResult{}, utils.ErrInternal(rerr)
+			return nil, utils.ErrInternal(rerr)
 		}
-		return AuthResult{}, utils.ErrUnauthorized("refresh token has expired")
+		return nil, utils.ErrUnauthorized("refresh token has expired")
 	}
 
 	user, err := u.userRepo.GetByID(ctx, stored.UserID)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) {
-			return AuthResult{}, utils.ErrUnauthorized("invalid refresh token")
+			return nil, utils.ErrUnauthorized("invalid refresh token")
 		}
-		return AuthResult{}, utils.ErrInternal(err)
+		return nil, utils.ErrInternal(err)
 	}
 	if user.IsBanned {
 		if rerr := u.refresh.RevokeAllByUser(ctx, user.ID); rerr != nil {
-			return AuthResult{}, utils.ErrInternal(rerr)
+			return nil, utils.ErrInternal(rerr)
 		}
-		return AuthResult{}, utils.ErrForbidden("your account has been disabled")
+		return nil, utils.ErrForbidden("your account has been disabled")
 	}
 
 	access, err := u.tokens.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
-		return AuthResult{}, utils.ErrInternal(err)
+		return nil, utils.ErrInternal(err)
 	}
 	newRaw, err := security.GenerateOpaqueToken()
 	if err != nil {
-		return AuthResult{}, utils.ErrInternal(err)
+		return nil, utils.ErrInternal(err)
 	}
 
 	err = u.tx.WithTransaction(ctx, func(txCtx context.Context) error {
@@ -295,10 +288,10 @@ func (u *AuthUsecase) Refresh(ctx context.Context, rawToken string) (AuthResult,
 		return u.refresh.Insert(txCtx, &rt)
 	})
 	if err != nil {
-		return AuthResult{}, wrapInternal(err)
+		return nil, wrapInternal(err)
 	}
 
-	return AuthResult{
+	return &dto.AuthResult{
 		User:         user,
 		AccessToken:  access,
 		RefreshToken: newRaw,
@@ -408,14 +401,14 @@ func (u *AuthUsecase) ResetPassword(ctx context.Context, rawToken, newPassword s
 	return nil
 }
 
-func (u *AuthUsecase) issueSession(ctx context.Context, user entity.User, touchLogin bool) (AuthResult, error) {
+func (u *AuthUsecase) issueSession(ctx context.Context, user entity.User, touchLogin bool) (*dto.AuthResult, error) {
 	access, err := u.tokens.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
-		return AuthResult{}, utils.ErrInternal(err)
+		return nil, utils.ErrInternal(err)
 	}
 	rawRefresh, err := security.GenerateOpaqueToken()
 	if err != nil {
-		return AuthResult{}, utils.ErrInternal(err)
+		return nil, utils.ErrInternal(err)
 	}
 
 	err = u.tx.WithTransaction(ctx, func(txCtx context.Context) error {
@@ -433,10 +426,10 @@ func (u *AuthUsecase) issueSession(ctx context.Context, user entity.User, touchL
 		return nil
 	})
 	if err != nil {
-		return AuthResult{}, wrapInternal(err)
+		return nil, wrapInternal(err)
 	}
 
-	return AuthResult{
+	return &dto.AuthResult{
 		User:         user,
 		AccessToken:  access,
 		RefreshToken: rawRefresh,
