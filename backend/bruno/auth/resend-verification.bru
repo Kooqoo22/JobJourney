@@ -1,0 +1,39 @@
+meta {
+  name: Resend Verification
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/auth/resend-verification
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "ada@example.com"
+  }
+}
+
+docs {
+  ## Description
+  Reissues a verification link. Always returns 200 with a generic message (anti-enumeration); silently does nothing for unknown, already-verified, banned, or non-local accounts.
+
+  ## Responses
+  ### 200 OK
+  { "message": "if the email is registered and unverified, a verification link has been sent" }
+
+  ### 400 Bad Request
+  { "message": "invalid request body" }
+
+  ### 422 Unprocessable Entity
+  { "message": "validation failed", "errors": [ { "field": "Email", "message": "must be a valid email address" } ] }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}

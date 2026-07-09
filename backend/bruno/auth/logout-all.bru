@@ -1,0 +1,37 @@
+meta {
+  name: Logout All
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/auth/logout-all
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## Description
+  Revokes every active refresh token for the authenticated user. Requires a valid access token.
+
+  ## Responses
+  ### 200 OK
+  { "message": "logged out from all devices" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 401 Unauthorized
+  { "message": "invalid or expired token" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}
