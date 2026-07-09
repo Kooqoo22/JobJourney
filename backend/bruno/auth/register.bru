@@ -1,0 +1,52 @@
+meta {
+  name: Register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Timezone: {{timezone}}
+}
+
+body:json {
+  {
+    "email": "ada@example.com",
+    "password": "hunter2go",
+    "full_name": "Ada Lovelace",
+    "timezone": "Asia/Jakarta"
+  }
+}
+
+docs {
+  ## Description
+  Creates a local (email/password) account in an unverified state and emails a verification link asynchronously. `timezone` is optional (IANA name) and defaults to the server default when omitted. Password must be at least 8 characters and contain both letters and numbers.
+
+  ## Responses
+  ### 201 Created
+  { "message": "registration successful, please check your email to verify your account", "data": { "id": 1, "email": "ada@example.com", "full_name": "Ada Lovelace", "avatar_url": null, "timezone": "Asia/Jakarta", "auth_provider": "local", "is_verified": false, "role": "user", "created_at": "2026-07-09T10:00:00+07:00" } }
+
+  ### 400 Bad Request
+  { "message": "invalid request body" }
+
+  ### 409 Conflict
+  { "message": "email is already registered" }
+
+  ### 422 Unprocessable Entity
+  { "message": "validation failed", "errors": [ { "field": "Email", "message": "must be a valid email address" } ] }
+
+  ### 422 Unprocessable Entity
+  { "message": "password does not meet the requirements", "errors": [ { "field": "password", "message": "must be at least 8 characters" }, { "field": "password", "message": "must contain both letters and numbers" } ] }
+
+  ### 422 Unprocessable Entity
+  { "message": "validation failed", "errors": [ { "field": "timezone", "message": "must be a valid IANA timezone" } ] }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}

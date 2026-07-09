@@ -17,11 +17,14 @@ type Config struct {
 	Database DatabaseConfig
 	JWT      JWTConfig
 	CORS     CORSConfig
+	SMTP     SMTPConfig
+	Auth     AuthConfig
 }
 
 type AppConfig struct {
 	Env             string
 	DefaultTimezone string
+	FrontendURL     string
 }
 
 type ServerConfig struct {
@@ -56,6 +59,20 @@ type CORSConfig struct {
 	AllowedHeaders []string
 }
 
+type SMTPConfig struct {
+	Host      string
+	Port      string
+	Username  string
+	Password  string
+	FromEmail string
+	FromName  string
+}
+
+type AuthConfig struct {
+	VerifyTokenTTL time.Duration
+	ResetTokenTTL  time.Duration
+}
+
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
@@ -63,6 +80,7 @@ func Load() (*Config, error) {
 		App: AppConfig{
 			Env:             getEnv("APP_ENV", "development"),
 			DefaultTimezone: getEnv("APP_DEFAULT_TIMEZONE", "Asia/Jakarta"),
+			FrontendURL:     getEnv("APP_FRONTEND_URL", "http://localhost:5173"),
 		},
 		Server: ServerConfig{
 			Port:            getEnv("SERVER_PORT", "8080"),
@@ -91,6 +109,18 @@ func Load() (*Config, error) {
 			AllowedOrigins: getEnvSlice("CORS_ALLOWED_ORIGINS", []string{"http://localhost:5173"}),
 			AllowedMethods: getEnvSlice("CORS_ALLOWED_METHODS", []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}),
 			AllowedHeaders: getEnvSlice("CORS_ALLOWED_HEADERS", []string{"Origin", "Content-Type", "Authorization", "X-Timezone", "X-Request-ID"}),
+		},
+		SMTP: SMTPConfig{
+			Host:      getEnv("SMTP_HOST", ""),
+			Port:      getEnv("SMTP_PORT", "587"),
+			Username:  getEnv("SMTP_USERNAME", ""),
+			Password:  getEnv("SMTP_PASSWORD", ""),
+			FromEmail: getEnv("SMTP_FROM_EMAIL", ""),
+			FromName:  getEnv("SMTP_FROM_NAME", "JobJourney"),
+		},
+		Auth: AuthConfig{
+			VerifyTokenTTL: getEnvDuration("AUTH_VERIFY_TOKEN_TTL", 24*time.Hour),
+			ResetTokenTTL:  getEnvDuration("AUTH_RESET_TOKEN_TTL", 1*time.Hour),
 		},
 	}
 

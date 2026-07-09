@@ -1,0 +1,44 @@
+meta {
+  name: Login
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Timezone: {{timezone}}
+}
+
+body:json {
+  {
+    "email": "ada@example.com",
+    "password": "hunter2go"
+  }
+}
+
+docs {
+  ## Description
+  Authenticates and issues a session (JWT access token + rotating opaque refresh token). A single generic message is returned for both unknown email and wrong password.
+
+  ## Responses
+  ### 200 OK
+  { "message": "login successful", "data": { "user": { "id": 1, "email": "ada@example.com", "full_name": "Ada Lovelace", "avatar_url": null, "timezone": "Asia/Jakarta", "auth_provider": "local", "is_verified": false, "role": "user", "created_at": "2026-07-09T10:00:00+07:00" }, "tokens": { "access_token": "eyJhbGciOi...", "refresh_token": "H2f0h...", "token_type": "Bearer", "expires_in": 900 } } }
+
+  ### 401 Unauthorized
+  { "message": "email or password is incorrect" }
+
+  ### 403 Forbidden
+  { "message": "your account has been disabled" }
+
+  ### 422 Unprocessable Entity
+  { "message": "validation failed", "errors": [ { "field": "Email", "message": "must be a valid email address" } ] }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}

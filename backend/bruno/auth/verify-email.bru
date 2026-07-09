@@ -1,0 +1,49 @@
+meta {
+  name: Verify Email
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/auth/verify-email
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Timezone: {{timezone}}
+}
+
+body:json {
+  {
+    "token": "paste-raw-token-from-email-link"
+  }
+}
+
+docs {
+  ## Description
+  Consumes a single-use verification token (24h TTL) and marks the account verified. A missing, already-used, or expired token returns 400.
+
+  ## Responses
+  ### 200 OK
+  { "message": "email verified successfully", "data": { "id": 1, "email": "ada@example.com", "full_name": "Ada Lovelace", "avatar_url": null, "timezone": "Asia/Jakarta", "auth_provider": "local", "is_verified": true, "role": "user", "created_at": "2026-07-09T10:00:00+07:00" } }
+
+  ### 400 Bad Request
+  { "message": "verification link is invalid" }
+
+  ### 400 Bad Request
+  { "message": "verification link has already been used" }
+
+  ### 400 Bad Request
+  { "message": "verification link has expired" }
+
+  ### 403 Forbidden
+  { "message": "your account has been disabled" }
+
+  ### 404 Not Found
+  { "message": "account not found" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}

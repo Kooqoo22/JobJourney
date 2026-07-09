@@ -1,0 +1,48 @@
+meta {
+  name: Refresh Token
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/auth/refresh
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "refresh_token": "{{refreshToken}}"
+  }
+}
+
+docs {
+  ## Description
+  Rotates the refresh token and issues a new access token. The presented refresh token is single-use and revoked on success. Presenting an already-revoked token is treated as reuse and revokes the entire token family.
+
+  ## Responses
+  ### 200 OK
+  { "message": "token refreshed", "data": { "access_token": "eyJhbGciOi...", "refresh_token": "N3wR4w...", "token_type": "Bearer", "expires_in": 900 } }
+
+  ### 400 Bad Request
+  { "message": "invalid request body" }
+
+  ### 401 Unauthorized
+  { "message": "invalid refresh token" }
+
+  ### 401 Unauthorized
+  { "message": "refresh token has been revoked" }
+
+  ### 401 Unauthorized
+  { "message": "refresh token has expired" }
+
+  ### 403 Forbidden
+  { "message": "your account has been disabled" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}
