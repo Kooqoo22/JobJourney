@@ -11,8 +11,6 @@ import (
 	"github.com/Kooqoo22/JobJourney/backend/internal/database"
 )
 
-var ErrEmailTokenNotFound = errors.New("email token not found")
-
 type EmailTokenRepository struct {
 	db *sqlx.DB
 }
@@ -48,7 +46,7 @@ func (r *EmailTokenRepository) GetActiveByHash(ctx context.Context, tokenHash, t
 	query := `SELECT * FROM email_tokens WHERE token_hash = $1 AND type = $2`
 	if err := sqlx.GetContext(ctx, exec, &t, query, tokenHash, tokenType); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return entity.EmailToken{}, ErrEmailTokenNotFound
+			return entity.EmailToken{}, entity.ErrEmailTokenNotFound
 		}
 		return entity.EmailToken{}, err
 	}

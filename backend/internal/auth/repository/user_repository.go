@@ -11,8 +11,6 @@ import (
 	"github.com/Kooqoo22/JobJourney/backend/internal/database"
 )
 
-var ErrUserNotFound = errors.New("user not found")
-
 type UserRepository struct {
 	db *sqlx.DB
 }
@@ -48,7 +46,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (entity.U
 	query := `SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL`
 	if err := sqlx.GetContext(ctx, exec, &u, query, email); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return entity.User{}, ErrUserNotFound
+			return entity.User{}, entity.ErrUserNotFound
 		}
 		return entity.User{}, err
 	}
@@ -61,7 +59,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int64) (entity.User, er
 	query := `SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL`
 	if err := sqlx.GetContext(ctx, exec, &u, query, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return entity.User{}, ErrUserNotFound
+			return entity.User{}, entity.ErrUserNotFound
 		}
 		return entity.User{}, err
 	}

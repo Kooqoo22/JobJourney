@@ -136,7 +136,7 @@ func (u *AuthUsecase) VerifyEmail(ctx context.Context, rawToken string) (entity.
 	err := u.tx.WithTransaction(ctx, func(txCtx context.Context) error {
 		et, err := u.emailTokens.GetActiveByHash(txCtx, hash, "verify")
 		if err != nil {
-			if errors.Is(err, repository.ErrEmailTokenNotFound) {
+			if errors.Is(err, entity.ErrEmailTokenNotFound) {
 				return utils.ErrBadRequest("verification link is invalid")
 			}
 			return err
@@ -150,7 +150,7 @@ func (u *AuthUsecase) VerifyEmail(ctx context.Context, rawToken string) (entity.
 
 		user, err := u.userRepo.GetByID(txCtx, et.UserID)
 		if err != nil {
-			if errors.Is(err, repository.ErrUserNotFound) {
+			if errors.Is(err, entity.ErrUserNotFound) {
 				return utils.ErrNotFound("account not found")
 			}
 			return err
@@ -180,7 +180,7 @@ func (u *AuthUsecase) VerifyEmail(ctx context.Context, rawToken string) (entity.
 func (u *AuthUsecase) ResendVerification(ctx context.Context, email string) error {
 	user, err := u.userRepo.GetByEmail(ctx, email)
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
+		if errors.Is(err, entity.ErrUserNotFound) {
 			return nil
 		}
 		return utils.ErrInternal(err)
@@ -217,7 +217,7 @@ func (u *AuthUsecase) ResendVerification(ctx context.Context, email string) erro
 func (u *AuthUsecase) Login(ctx context.Context, req dto.LoginRequest) (AuthResult, error) {
 	user, err := u.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
+		if errors.Is(err, entity.ErrUserNotFound) {
 			return AuthResult{}, utils.ErrUnauthorized(genericAuthMessage)
 		}
 		return AuthResult{}, utils.ErrInternal(err)
@@ -241,7 +241,7 @@ func (u *AuthUsecase) Refresh(ctx context.Context, rawToken string) (AuthResult,
 
 	stored, err := u.refresh.GetByHash(ctx, hash)
 	if err != nil {
-		if errors.Is(err, repository.ErrRefreshTokenNotFound) {
+		if errors.Is(err, entity.ErrRefreshTokenNotFound) {
 			return AuthResult{}, utils.ErrUnauthorized("invalid refresh token")
 		}
 		return AuthResult{}, utils.ErrInternal(err)
@@ -262,7 +262,7 @@ func (u *AuthUsecase) Refresh(ctx context.Context, rawToken string) (AuthResult,
 
 	user, err := u.userRepo.GetByID(ctx, stored.UserID)
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
+		if errors.Is(err, entity.ErrUserNotFound) {
 			return AuthResult{}, utils.ErrUnauthorized("invalid refresh token")
 		}
 		return AuthResult{}, utils.ErrInternal(err)
@@ -323,7 +323,7 @@ func (u *AuthUsecase) LogoutAll(ctx context.Context, userID int64) error {
 func (u *AuthUsecase) ForgotPassword(ctx context.Context, email string) error {
 	user, err := u.userRepo.GetByEmail(ctx, email)
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
+		if errors.Is(err, entity.ErrUserNotFound) {
 			return nil
 		}
 		return utils.ErrInternal(err)
@@ -371,7 +371,7 @@ func (u *AuthUsecase) ResetPassword(ctx context.Context, rawToken, newPassword s
 	err = u.tx.WithTransaction(ctx, func(txCtx context.Context) error {
 		et, err := u.emailTokens.GetActiveByHash(txCtx, hash, "reset")
 		if err != nil {
-			if errors.Is(err, repository.ErrEmailTokenNotFound) {
+			if errors.Is(err, entity.ErrEmailTokenNotFound) {
 				return utils.ErrBadRequest("reset link is invalid")
 			}
 			return err
@@ -385,7 +385,7 @@ func (u *AuthUsecase) ResetPassword(ctx context.Context, rawToken, newPassword s
 
 		user, err := u.userRepo.GetByID(txCtx, et.UserID)
 		if err != nil {
-			if errors.Is(err, repository.ErrUserNotFound) {
+			if errors.Is(err, entity.ErrUserNotFound) {
 				return utils.ErrNotFound("account not found")
 			}
 			return err

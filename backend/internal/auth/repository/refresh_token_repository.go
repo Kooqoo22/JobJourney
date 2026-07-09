@@ -11,8 +11,6 @@ import (
 	"github.com/Kooqoo22/JobJourney/backend/internal/database"
 )
 
-var ErrRefreshTokenNotFound = errors.New("refresh token not found")
-
 type RefreshTokenRepository struct {
 	db *sqlx.DB
 }
@@ -48,7 +46,7 @@ func (r *RefreshTokenRepository) GetByHash(ctx context.Context, tokenHash string
 	query := `SELECT * FROM refresh_tokens WHERE token_hash = $1`
 	if err := sqlx.GetContext(ctx, exec, &t, query, tokenHash); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return entity.RefreshToken{}, ErrRefreshTokenNotFound
+			return entity.RefreshToken{}, entity.ErrRefreshTokenNotFound
 		}
 		return entity.RefreshToken{}, err
 	}
