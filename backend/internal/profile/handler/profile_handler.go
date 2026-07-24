@@ -28,6 +28,20 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, utils.NewSuccess("profile retrieved", resp))
 }
 
+func (h *ProfileHandler) ChangePassword(c *gin.Context) {
+	var req dto.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(err)
+		return
+	}
+	userID := c.GetInt64(middleware.ContextUserID)
+	if err := h.usecase.ChangePassword(c.Request.Context(), userID, req); err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewMessage("password changed successfully"))
+}
+
 func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	var req dto.UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
