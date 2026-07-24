@@ -9,6 +9,7 @@ import (
 type ApplicationRepoIface interface {
 	Insert(ctx context.Context, a *entity.Application) error
 	GetByID(ctx context.Context, id, userID int64) (entity.Application, error)
+	List(ctx context.Context, userID int64, f entity.ApplicationListFilter) ([]entity.Application, error)
 }
 
 type TxManagerIface interface {

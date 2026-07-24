@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/Kooqoo22/JobJourney/backend/internal/application/dto"
@@ -80,6 +81,90 @@ func (u *ApplicationUsecase) CreateApplication(ctx context.Context, userID int64
 	}
 
 	return mapper.ToApplicationResponse(a, userTZ), nil
+}
+
+type appListCursor struct {
+	SortVal string `json:"sv"`
+	ID      int64  `json:"id"`
+}
+
+func (u *ApplicationUsecase) ListApplications(ctx context.Context, userID int64, userTZ string, q dto.ListApplicationsQuery) ([]dto.ApplicationResponse, utils.CursorMeta, error) {
+	limit := utils.NormalizeLimit(q.Limit)
+
+	f := entity.ApplicationListFilter{
+		Keyword:         q.Q,
+		Status:          q.Status,
+		Source:          q.Source,
+		WorkArrangement: q.WorkArrangement,
+		EmploymentType:  q.EmploymentType,
+		FromDate:        q.FromDate,
+		ToDate:          q.ToDate,
+		IsArchived:      q.IsArchived,
+		SortBy:          q.SortBy,
+		SortDir:         q.SortDir,
+		Limit:           limit + 1,
+	}
+
+	if q.Cursor != "" {
+		var c appListCursor
+		if err := utils.DecodeCursor(q.Cursor, &c); err != nil {
+			return nil, utils.CursorMeta{}, utils.ErrUnprocessable("invalid cursor", nil)
+		}
+		f.CursorSortVal = &c.SortVal
+		f.CursorID = &c.ID
+	}
+
+	apps, err := u.repo.List(ctx, userID, f)
+	if err != nil {
+		return nil, utils.CursorMeta{}, utils.ErrInternal(err)
+	}
+
+	hasNext := len(apps) > limit
+	if hasNext {
+		apps = apps[:limit]
+	}
+
+	meta := utils.CursorMeta{HasNext: hasNext, Limit: limit}
+
+	if hasNext && len(apps) > 0 {
+		last := apps[len(apps)-1]
+		sv := listSortVal(last, q.SortBy, q.SortDir)
+		cursor, err := utils.EncodeCursor(appListCursor{SortVal: sv, ID: last.ID})
+		if err != nil {
+			return nil, utils.CursorMeta{}, utils.ErrInternal(err)
+		}
+		meta.NextCursor = cursor
+	}
+
+	responses := make([]dto.ApplicationResponse, len(apps))
+	for i, a := range apps {
+		responses[i] = mapper.ToApplicationResponse(a, userTZ)
+	}
+	return responses, meta, nil
+}
+
+func listSortVal(a entity.Application, sortBy, sortDir string) string {
+	dir := strings.ToUpper(sortDir)
+	if dir != "ASC" && dir != "DESC" {
+		dir = "DESC"
+	}
+	switch sortBy {
+	case "applied_date":
+		sentinel := "1970-01-01"
+		if dir == "ASC" {
+			sentinel = "9999-12-31"
+		}
+		if a.AppliedDate == nil {
+			return sentinel
+		}
+		return a.AppliedDate.Format("2006-01-02")
+	case "company_name":
+		return a.CompanyName
+	case "status":
+		return a.Status
+	default:
+		return a.UpdatedAt.UTC().Format(time.RFC3339Nano)
+	}
 }
 
 func validateCreateRequest(req dto.CreateApplicationRequest) error {

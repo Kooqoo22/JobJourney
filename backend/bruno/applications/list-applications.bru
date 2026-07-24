@@ -1,0 +1,61 @@
+meta {
+  name: List Applications
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/applications
+  auth: bearer
+}
+
+headers {
+  X-Timezone: {{timezone}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:query {
+  q:
+  status:
+  source:
+  work_arrangement:
+  employment_type:
+  from_date:
+  to_date:
+  is_archived:
+  sort_by: updated_at
+  sort_dir: desc
+  cursor:
+  limit: 20
+}
+
+docs {
+  ## Description
+  List the authenticated user's job applications with cursor-based pagination. Supports keyword search (company_name, position_title), filters, and sort options. By default returns non-archived applications sorted by updated_at DESC.
+
+  ## Query Parameters
+  - q: keyword search across company_name and position_title (case-insensitive)
+  - status: filter by enum (wishlist|applied|screening|interview|offer|accepted|rejected|withdrawn|ghosted)
+  - source: filter by source string (e.g. LinkedIn)
+  - work_arrangement: filter by enum (remote|onsite|hybrid)
+  - employment_type: filter by enum (full_time|part_time|contract|internship|freelance)
+  - from_date / to_date: filter by applied_date range (YYYY-MM-DD)
+  - is_archived: true or false; omit to return non-archived only
+  - sort_by: updated_at|applied_date|company_name|status (default: updated_at)
+  - sort_dir: asc|desc (default: desc)
+  - cursor: opaque cursor from previous response meta.next_cursor
+  - limit: 1-100 (default: 20)
+
+  ## Responses
+  ### 200 OK
+  { "message": "applications retrieved", "data": [ { "id": 1, "company_name": "Acme Corp", "position_title": "Backend Engineer", "status": "applied", "is_archived": false, "created_at": "2026-07-09T10:00:00+07:00", "updated_at": "2026-07-09T10:00:00+07:00" } ], "meta": { "next_cursor": "eyJzdiI6...", "has_next": true, "limit": 20 } }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}
