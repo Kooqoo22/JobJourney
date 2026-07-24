@@ -10,4 +10,5 @@ import (
 type ApplicationUsecaseIface interface {
 	CreateApplication(ctx context.Context, userID int64, userTZ string, req dto.CreateApplicationRequest) (dto.ApplicationResponse, error)
 	ListApplications(ctx context.Context, userID int64, userTZ string, q dto.ListApplicationsQuery) ([]dto.ApplicationResponse, utils.CursorMeta, error)
+	GetApplication(ctx context.Context, id, userID int64, userTZ string) (dto.ApplicationResponse, error)
 }

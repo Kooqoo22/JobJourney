@@ -167,6 +167,14 @@ func listSortVal(a entity.Application, sortBy, sortDir string) string {
 	}
 }
 
+func (u *ApplicationUsecase) GetApplication(ctx context.Context, id, userID int64, userTZ string) (dto.ApplicationResponse, error) {
+	a, err := u.repo.GetByID(ctx, id, userID)
+	if err != nil {
+		return dto.ApplicationResponse{}, wrapNotFound(err)
+	}
+	return mapper.ToApplicationResponse(a, userTZ), nil
+}
+
 func validateCreateRequest(req dto.CreateApplicationRequest) error {
 	status := req.Status
 	if status == "" {

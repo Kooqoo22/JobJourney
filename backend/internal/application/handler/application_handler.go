@@ -18,6 +18,25 @@ func New(uc ApplicationUsecaseIface) *ApplicationHandler {
 	return &ApplicationHandler{usecase: uc}
 }
 
+func (h *ApplicationHandler) GetApplication(c *gin.Context) {
+	var param dto.ApplicationIDParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	userID := c.GetInt64(middleware.ContextUserID)
+	tz := c.GetHeader("X-Timezone")
+	if tz == "" {
+		tz = "Asia/Jakarta"
+	}
+	resp, err := h.usecase.GetApplication(c.Request.Context(), param.ID, userID, tz)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewSuccess("application retrieved", resp))
+}
+
 func (h *ApplicationHandler) ListApplications(c *gin.Context) {
 	var q dto.ListApplicationsQuery
 	if err := c.ShouldBindQuery(&q); err != nil {

@@ -81,6 +81,7 @@ func registerApplicationRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gi
 	apps := rg.Group("/applications", authMW)
 	apps.GET("", h.ListApplications)
 	apps.POST("", h.CreateApplication)
+	apps.GET("/:id", h.GetApplication)
 }
 
 func registerAuthRoutes(rg *gin.RouterGroup, deps Dependencies) {
