@@ -14,10 +14,11 @@ import (
 
 type ProfileUsecase struct {
 	repo ProfileRepoIface
+	tx   TxManagerIface
 }
 
-func New(repo ProfileRepoIface) *ProfileUsecase {
-	return &ProfileUsecase{repo: repo}
+func New(repo ProfileRepoIface, tx TxManagerIface) *ProfileUsecase {
+	return &ProfileUsecase{repo: repo, tx: tx}
 }
 
 func (u *ProfileUsecase) GetProfile(ctx context.Context, userID int64) (dto.ProfileResponse, error) {
@@ -96,6 +97,19 @@ func (u *ProfileUsecase) ChangePassword(ctx context.Context, userID int64, req d
 		return utils.ErrInternal(err)
 	}
 	if err := u.repo.UpdatePassword(ctx, userID, newHash); err != nil {
+		return utils.ErrInternal(err)
+	}
+	return nil
+}
+
+func (u *ProfileUsecase) DeleteAccount(ctx context.Context, userID int64) error {
+	err := u.tx.WithTransaction(ctx, func(txCtx context.Context) error {
+		if err := u.repo.SoftDeleteUserData(txCtx, userID); err != nil {
+			return err
+		}
+		return u.repo.SoftDeleteUser(txCtx, userID)
+	})
+	if err != nil {
 		return utils.ErrInternal(err)
 	}
 	return nil

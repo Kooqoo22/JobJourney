@@ -1,0 +1,30 @@
+meta {
+  name: Delete Account
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/profile
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## Description
+  Permanently soft-deletes the authenticated user's account. Cascade soft-deletes all job applications, events, documents, and revokes all refresh tokens in a single transaction. This action is irreversible within the retention window.
+
+  ## Responses
+  ### 200 OK
+  { "message": "account deleted" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}

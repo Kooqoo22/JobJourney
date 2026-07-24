@@ -11,4 +11,10 @@ type ProfileRepoIface interface {
 	Update(ctx context.Context, userID int64, fullName string, avatarURL *string, timezone string) (entity.User, error)
 	UpdatePassword(ctx context.Context, userID int64, passwordHash string) error
 	UpdateTimezone(ctx context.Context, userID int64, timezone string) error
+	SoftDeleteUser(ctx context.Context, userID int64) error
+	SoftDeleteUserData(ctx context.Context, userID int64) error
+}
+
+type TxManagerIface interface {
+	WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }

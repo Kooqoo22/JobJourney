@@ -56,7 +56,8 @@ func registerRoutes(rg *gin.RouterGroup, deps Dependencies) {
 
 func registerProfileRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.HandlerFunc) {
 	repo := profilerepo.New(deps.DB)
-	uc := profileusecase.New(repo)
+	tx := database.NewTxManager(deps.DB)
+	uc := profileusecase.New(repo, tx)
 	h := profilehandler.New(uc)
 
 	profile := rg.Group("/profile", authMW)
@@ -64,6 +65,7 @@ func registerProfileRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.Ha
 	profile.PUT("", h.UpdateProfile)
 	profile.PATCH("/password", h.ChangePassword)
 	profile.PATCH("/preferences", h.UpdatePreferences)
+	profile.DELETE("", h.DeleteAccount)
 }
 
 func registerAuthRoutes(rg *gin.RouterGroup, deps Dependencies) {
