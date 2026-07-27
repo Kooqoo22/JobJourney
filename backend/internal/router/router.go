@@ -62,6 +62,7 @@ func registerProfileRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.Ha
 	profile := rg.Group("/profile", authMW)
 	profile.GET("", h.GetProfile)
 	profile.PUT("", h.UpdateProfile)
+	profile.PATCH("/password", h.ChangePassword)
 }
 
 func registerAuthRoutes(rg *gin.RouterGroup, deps Dependencies) {
