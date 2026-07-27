@@ -248,3 +248,56 @@ func (u *ApplicationUsecase) ListEvents(ctx context.Context, applicationID, user
 	}
 	return responses, utils.NewPageMeta(total, page, limit), nil
 }
+
+func (u *ApplicationUsecase) UpdateEvent(ctx context.Context, eventID, applicationID, userID int64, userTZ string, req dto.UpdateEventRequest) (dto.EventResponse, error) {
+	e, err := u.eventRepo.GetEventByID(ctx, eventID, applicationID, userID)
+	if err != nil {
+		return dto.EventResponse{}, utils.ErrNotFound("event not found")
+	}
+
+	if req.Type != nil {
+		e.Type = *req.Type
+	}
+	if req.Title != nil {
+		e.Title = *req.Title
+	}
+	if req.EventAt != nil {
+		t, parseErr := time.Parse(time.RFC3339, *req.EventAt)
+		if parseErr != nil {
+			return dto.EventResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
+				{Field: "event_at", Message: "must be a valid RFC 3339 datetime"},
+			})
+		}
+		e.EventAt = t.UTC()
+	}
+	if req.Notes != nil {
+		if *req.Notes == "" {
+			e.Notes = nil
+		} else {
+			e.Notes = req.Notes
+		}
+	}
+	if req.RemindAt != nil {
+		if *req.RemindAt == "" {
+			e.RemindAt = nil
+		} else {
+			t, parseErr := time.Parse(time.RFC3339, *req.RemindAt)
+			if parseErr != nil {
+				return dto.EventResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
+					{Field: "remind_at", Message: "must be a valid RFC 3339 datetime"},
+				})
+			}
+			if !t.After(time.Now().UTC()) {
+				return dto.EventResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
+					{Field: "remind_at", Message: "must be in the future"},
+				})
+			}
+			e.RemindAt = &t
+		}
+	}
+
+	if err := u.eventRepo.UpdateEvent(ctx, &e); err != nil {
+		return dto.EventResponse{}, utils.ErrInternal(err)
+	}
+	return mapper.ToEventResponse(e, userTZ), nil
+}

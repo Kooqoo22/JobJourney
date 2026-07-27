@@ -90,6 +90,7 @@ func registerApplicationRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gi
 	apps.PATCH("/:id/archive", h.ToggleArchive)
 	apps.GET("/:id/events", h.ListEvents)
 	apps.POST("/:id/events", h.CreateEvent)
+	apps.PUT("/:id/events/:event_id", h.UpdateEvent)
 }
 
 func registerAuthRoutes(rg *gin.RouterGroup, deps Dependencies) {
