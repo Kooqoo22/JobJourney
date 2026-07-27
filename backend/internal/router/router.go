@@ -74,6 +74,7 @@ func registerAdminRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.Hand
 
 	adminGroup := rg.Group("/admin", authMW, middleware.RequireRole("admin"))
 	adminGroup.GET("/users", h.ListUsers)
+	adminGroup.DELETE("/users/:id", h.DeleteUser)
 	adminGroup.POST("/users/:id/ban", h.BanUser)
 	adminGroup.DELETE("/users/:id/ban", h.UnbanUser)
 }

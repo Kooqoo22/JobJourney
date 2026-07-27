@@ -12,6 +12,8 @@ type AdminRepoIface interface {
 	BanUser(ctx context.Context, id int64, reason *string) error
 	UnbanUser(ctx context.Context, id int64) error
 	RevokeAllTokensByUserID(ctx context.Context, userID int64) error
+	SoftDeleteUserData(ctx context.Context, userID int64) error
+	SoftDeleteUser(ctx context.Context, userID int64) error
 }
 
 type TxManagerIface interface {

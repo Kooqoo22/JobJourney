@@ -1,0 +1,50 @@
+meta {
+  name: Admin Delete User
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/admin/users/:id
+  body: none
+  auth: bearer
+}
+
+headers {
+  X-Timezone: {{timezone}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:path {
+  id: 2
+}
+
+docs {
+  ## Description
+  Admin-only endpoint. Cascade soft-deletes a user account along with all their associated data (applications, events, documents, refresh tokens). Cannot delete yourself or another admin account.
+
+  ## Responses
+  ### 200 OK
+  { "message": "user deleted" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 403 Forbidden
+  { "message": "insufficient permissions" }
+
+  ### 403 Forbidden (self-delete)
+  { "message": "cannot delete your own account" }
+
+  ### 403 Forbidden (admin target)
+  { "message": "cannot delete an admin account" }
+
+  ### 404 Not Found
+  { "message": "user not found" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}
