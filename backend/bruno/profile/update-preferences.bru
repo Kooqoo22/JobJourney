@@ -1,0 +1,46 @@
+meta {
+  name: Update Preferences
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/profile/preferences
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "timezone": "America/New_York"
+  }
+}
+
+docs {
+  ## Description
+  Updates the user's timezone preference. The timezone must be a valid IANA timezone name. All subsequent date displays and reminder scheduling will use the new timezone.
+
+  ## Responses
+  ### 200 OK
+  { "message": "preferences updated", "data": { "timezone": "America/New_York" } }
+
+  ### 400 Bad Request
+  { "message": "invalid request body" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 422 Unprocessable Entity
+  { "message": "validation failed", "errors": [ { "field": "timezone", "message": "must be a valid IANA timezone" } ] }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}

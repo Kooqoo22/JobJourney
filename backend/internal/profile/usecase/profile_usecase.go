@@ -96,3 +96,15 @@ func (u *ProfileUsecase) ChangePassword(ctx context.Context, userID int64, req d
 	}
 	return nil
 }
+
+func (u *ProfileUsecase) UpdatePreferences(ctx context.Context, userID int64, req dto.UpdatePreferencesRequest) (dto.PreferencesResponse, error) {
+	if !utils.IsValidTimezone(req.Timezone) {
+		return dto.PreferencesResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
+			{Field: "timezone", Message: "must be a valid IANA timezone"},
+		})
+	}
+	if err := u.repo.UpdateTimezone(ctx, userID, req.Timezone); err != nil {
+		return dto.PreferencesResponse{}, utils.ErrInternal(err)
+	}
+	return dto.PreferencesResponse{Timezone: req.Timezone}, nil
+}
