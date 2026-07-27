@@ -32,6 +32,13 @@ func (r *ProfileRepository) GetByID(ctx context.Context, userID int64) (entity.U
 	return u, nil
 }
 
+func (r *ProfileRepository) UpdatePassword(ctx context.Context, userID int64, passwordHash string) error {
+	exec := database.GetDBTx(ctx, r.db)
+	query := `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL`
+	_, err := exec.ExecContext(ctx, query, passwordHash, userID)
+	return err
+}
+
 func (r *ProfileRepository) Update(ctx context.Context, userID int64, fullName string, avatarURL *string, timezone string) (entity.User, error) {
 	exec := database.GetDBTx(ctx, r.db)
 	var u entity.User

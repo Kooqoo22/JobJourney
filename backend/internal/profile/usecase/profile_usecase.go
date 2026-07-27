@@ -7,6 +7,7 @@ import (
 	"github.com/Kooqoo22/JobJourney/backend/internal/auth/entity"
 	"github.com/Kooqoo22/JobJourney/backend/internal/profile/dto"
 	"github.com/Kooqoo22/JobJourney/backend/internal/profile/mapper"
+	"github.com/Kooqoo22/JobJourney/backend/pkg/security"
 	"github.com/Kooqoo22/JobJourney/backend/pkg/utils"
 )
 
@@ -67,4 +68,31 @@ func (u *ProfileUsecase) UpdateProfile(ctx context.Context, userID int64, req dt
 		return dto.ProfileResponse{}, utils.ErrInternal(err)
 	}
 	return mapper.ToProfileResponse(updated), nil
+}
+
+func (u *ProfileUsecase) ChangePassword(ctx context.Context, userID int64, req dto.ChangePasswordRequest) error {
+	if fields := security.PasswordStrengthErrors("new_password", req.NewPassword); fields != nil {
+		return utils.ErrUnprocessable("password does not meet the requirements", fields)
+	}
+
+	user, err := u.repo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, entity.ErrUserNotFound) {
+			return utils.ErrNotFound("user not found")
+		}
+		return utils.ErrInternal(err)
+	}
+
+	if !security.CheckPassword(user.PasswordHash, req.CurrentPassword) {
+		return utils.ErrUnauthorized("current password is incorrect")
+	}
+
+	newHash, err := security.HashPassword(req.NewPassword)
+	if err != nil {
+		return utils.ErrInternal(err)
+	}
+	if err := u.repo.UpdatePassword(ctx, userID, newHash); err != nil {
+		return utils.ErrInternal(err)
+	}
+	return nil
 }

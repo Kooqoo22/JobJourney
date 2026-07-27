@@ -9,4 +9,5 @@ import (
 type ProfileRepoIface interface {
 	GetByID(ctx context.Context, userID int64) (entity.User, error)
 	Update(ctx context.Context, userID int64, fullName string, avatarURL *string, timezone string) (entity.User, error)
+	UpdatePassword(ctx context.Context, userID int64, passwordHash string) error
 }
