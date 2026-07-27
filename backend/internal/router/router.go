@@ -15,6 +15,9 @@ import (
 	apphandler "github.com/Kooqoo22/JobJourney/backend/internal/application/handler"
 	apprepo "github.com/Kooqoo22/JobJourney/backend/internal/application/repository"
 	appusecase "github.com/Kooqoo22/JobJourney/backend/internal/application/usecase"
+	statshandler "github.com/Kooqoo22/JobJourney/backend/internal/stats/handler"
+	statsrepo "github.com/Kooqoo22/JobJourney/backend/internal/stats/repository"
+	statsusecase "github.com/Kooqoo22/JobJourney/backend/internal/stats/usecase"
 	profilehandler "github.com/Kooqoo22/JobJourney/backend/internal/profile/handler"
 	profilerepo "github.com/Kooqoo22/JobJourney/backend/internal/profile/repository"
 	profileusecase "github.com/Kooqoo22/JobJourney/backend/internal/profile/usecase"
@@ -56,6 +59,16 @@ func registerRoutes(rg *gin.RouterGroup, deps Dependencies) {
 	registerAuthRoutes(rg, deps)
 	registerProfileRoutes(rg, deps, authMW)
 	registerApplicationRoutes(rg, deps, authMW)
+	registerStatsRoutes(rg, deps, authMW)
+}
+
+func registerStatsRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.HandlerFunc) {
+	repo := statsrepo.New(deps.DB)
+	uc := statsusecase.New(repo)
+	h := statshandler.New(uc)
+
+	stats := rg.Group("/stats", authMW)
+	stats.GET("/summary", h.GetSummary)
 }
 
 func registerProfileRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.HandlerFunc) {
