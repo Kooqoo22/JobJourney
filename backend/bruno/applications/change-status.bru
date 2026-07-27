@@ -1,0 +1,53 @@
+meta {
+  name: Change Application Status
+  type: http
+  seq: 7
+}
+
+patch {
+  url: {{baseUrl}}/applications/1/status
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  X-Timezone: {{timezone}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "status": "interview"
+  }
+}
+
+docs {
+  ## Description
+  Change the status of a job application. No-op (returns current state) if the status is the same as the current one. On status change, automatically creates an application_events entry of type status_changed in the same transaction.
+
+  ## Allowed status values
+  wishlist | applied | screening | interview | offer | accepted | rejected | withdrawn | ghosted
+
+  ## Responses
+  ### 200 OK
+  { "message": "status updated", "data": { "id": 1, "company_name": "Acme Corp", "position_title": "Backend Engineer", "status": "interview", "is_archived": false, "created_at": "2026-07-09T10:00:00+07:00", "updated_at": "2026-07-09T12:00:00+07:00" } }
+
+  ### 400 Bad Request
+  { "message": "invalid request body" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 404 Not Found
+  { "message": "application not found" }
+
+  ### 422 Unprocessable Entity
+  { "message": "validation failed", "errors": [ { "field": "status", "message": "must be one of: wishlist applied screening interview offer accepted rejected withdrawn ghosted" } ] }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}

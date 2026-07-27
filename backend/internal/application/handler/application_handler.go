@@ -18,6 +18,77 @@ func New(uc ApplicationUsecaseIface) *ApplicationHandler {
 	return &ApplicationHandler{usecase: uc}
 }
 
+func (h *ApplicationHandler) CreateEvent(c *gin.Context) {
+	var param dto.ApplicationIDParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	var req dto.CreateEventRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(err)
+		return
+	}
+	userID := c.GetInt64(middleware.ContextUserID)
+	tz := c.GetHeader("X-Timezone")
+	if tz == "" {
+		tz = "Asia/Jakarta"
+	}
+	resp, err := h.usecase.CreateEvent(c.Request.Context(), param.ID, userID, tz, req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusCreated, utils.NewSuccess("event created", resp))
+}
+
+func (h *ApplicationHandler) ToggleArchive(c *gin.Context) {
+	var param dto.ApplicationIDParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	var req dto.ArchiveRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(err)
+		return
+	}
+	userID := c.GetInt64(middleware.ContextUserID)
+	if err := h.usecase.ToggleArchive(c.Request.Context(), param.ID, userID, *req.IsArchived); err != nil {
+		c.Error(err)
+		return
+	}
+	msg := "application unarchived"
+	if *req.IsArchived {
+		msg = "application archived"
+	}
+	c.JSON(http.StatusOK, utils.NewMessage(msg))
+}
+
+func (h *ApplicationHandler) ChangeStatus(c *gin.Context) {
+	var param dto.ApplicationIDParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	var req dto.ChangeStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(err)
+		return
+	}
+	userID := c.GetInt64(middleware.ContextUserID)
+	tz := c.GetHeader("X-Timezone")
+	if tz == "" {
+		tz = "Asia/Jakarta"
+	}
+	resp, err := h.usecase.ChangeStatus(c.Request.Context(), param.ID, userID, tz, req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewSuccess("status updated", resp))
+}
+
 func (h *ApplicationHandler) RestoreApplication(c *gin.Context) {
 	var param dto.ApplicationIDParam
 	if err := c.ShouldBindUri(&param); err != nil {

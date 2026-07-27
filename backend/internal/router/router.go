@@ -74,8 +74,9 @@ func registerProfileRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.Ha
 
 func registerApplicationRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.HandlerFunc) {
 	repo := apprepo.New(deps.DB)
+	eventRepo := apprepo.NewEventRepository(deps.DB)
 	tx := database.NewTxManager(deps.DB)
-	uc := appusecase.New(repo, tx)
+	uc := appusecase.New(repo, eventRepo, tx)
 	h := apphandler.New(uc)
 
 	apps := rg.Group("/applications", authMW)
@@ -85,6 +86,9 @@ func registerApplicationRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gi
 	apps.PUT("/:id", h.UpdateApplication)
 	apps.DELETE("/:id", h.DeleteApplication)
 	apps.PATCH("/:id/restore", h.RestoreApplication)
+	apps.PATCH("/:id/status", h.ChangeStatus)
+	apps.PATCH("/:id/archive", h.ToggleArchive)
+	apps.POST("/:id/events", h.CreateEvent)
 }
 
 func registerAuthRoutes(rg *gin.RouterGroup, deps Dependencies) {

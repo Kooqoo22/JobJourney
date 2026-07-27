@@ -10,14 +10,13 @@ import (
 
 func ToProfileResponse(u entity.User) dto.ProfileResponse {
 	return dto.ProfileResponse{
-		ID:           u.ID,
-		Email:        u.Email,
-		FullName:     u.FullName,
-		AvatarURL:    u.AvatarURL,
-		Timezone:     u.Timezone,
-		AuthProvider: u.AuthProvider,
-		IsVerified:   u.IsVerified,
-		Role:         u.Role,
-		CreatedAt:    utils.ToLocal(u.CreatedAt, u.Timezone).Format(time.RFC3339),
+		ID:         u.ID,
+		Email:      u.Email,
+		FullName:   u.FullName,
+		AvatarURL:  u.AvatarURL,
+		Timezone:   u.Timezone,
+		IsVerified: u.IsVerified,
+		Role:       u.Role,
+		CreatedAt:  utils.ToLocal(u.CreatedAt, u.Timezone).Format(time.RFC3339),
 	}
 }
