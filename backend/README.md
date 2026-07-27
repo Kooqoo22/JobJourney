@@ -1,6 +1,6 @@
 # JobJourney — Backend
 
-Job-application tracker API. Go 1.25 + Gin + PostgreSQL, Clean Architecture (see `../CLAUDE.md`).
+Job-application tracker API. Go 1.25 + Gin + PostgreSQL, Clean Architecture.
 
 ## Layout
 
