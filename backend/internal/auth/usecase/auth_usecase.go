@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"time"
+	"unicode"
 
 	"github.com/Kooqoo22/JobJourney/backend/internal/auth/dto"
 	"github.com/Kooqoo22/JobJourney/backend/internal/auth/entity"
@@ -60,12 +61,12 @@ func New(d Deps) *AuthUsecase {
 }
 
 func (u *AuthUsecase) Register(ctx context.Context, req dto.RegisterRequest) (entity.User, error) {
-	if fields := security.PasswordStrengthErrors("password", req.Password); fields != nil {
+	if fields := passwordStrengthErrors("password", req.Password); fields != nil {
 		return entity.User{}, utils.ErrUnprocessable("password does not meet the requirements", fields)
 	}
 
 	tz := u.resolveTimezone(req.Timezone)
-	if !utils.IsValidTimezone(tz) {
+	if !isValidTimezone(tz) {
 		return entity.User{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{{Field: "timezone", Message: "must be a valid IANA timezone"}})
 	}
 
@@ -84,7 +85,8 @@ func (u *AuthUsecase) Register(ctx context.Context, req dto.RegisterRequest) (en
 
 	user := entity.User{
 		Email:        req.Email,
-		PasswordHash: hash,
+		PasswordHash: &hash,
+		AuthProvider: "local",
 		FullName:     req.FullName,
 		Timezone:     tz,
 		IsVerified:   false,
@@ -175,7 +177,7 @@ func (u *AuthUsecase) ResendVerification(ctx context.Context, email string) erro
 		}
 		return utils.ErrInternal(err)
 	}
-	if user.IsVerified || user.IsBanned {
+	if user.AuthProvider != "local" || user.IsVerified || user.IsBanned {
 		return nil
 	}
 
@@ -212,7 +214,7 @@ func (u *AuthUsecase) Login(ctx context.Context, req dto.LoginRequest) (*dto.Aut
 		}
 		return nil, utils.ErrInternal(err)
 	}
-	if !security.CheckPassword(user.PasswordHash, req.Password) {
+	if user.PasswordHash == nil || !security.CheckPassword(*user.PasswordHash, req.Password) {
 		return nil, utils.ErrUnauthorized(genericAuthMessage)
 	}
 	if user.IsBanned {
@@ -318,7 +320,7 @@ func (u *AuthUsecase) ForgotPassword(ctx context.Context, email string) error {
 		}
 		return utils.ErrInternal(err)
 	}
-	if user.IsBanned {
+	if user.AuthProvider != "local" || user.PasswordHash == nil || user.IsBanned {
 		return nil
 	}
 
@@ -348,7 +350,7 @@ func (u *AuthUsecase) ForgotPassword(ctx context.Context, email string) error {
 }
 
 func (u *AuthUsecase) ResetPassword(ctx context.Context, rawToken, newPassword string) error {
-	if fields := security.PasswordStrengthErrors("new_password", newPassword); fields != nil {
+	if fields := passwordStrengthErrors("new_password", newPassword); fields != nil {
 		return utils.ErrUnprocessable("password does not meet the requirements", fields)
 	}
 
@@ -457,4 +459,37 @@ func (u *AuthUsecase) sendPasswordResetAsync(email, name, rawToken string) {
 			slog.Error("failed to send password reset email", "error", err, "email", email)
 		}
 	}()
+}
+
+func wrapInternal(err error) error {
+	var appErr *utils.AppError
+	if errors.As(err, &appErr) {
+		return err
+	}
+	return utils.ErrInternal(err)
+}
+
+func passwordStrengthErrors(field, pw string) []utils.FieldError {
+	var hasLetter, hasDigit bool
+	for _, r := range pw {
+		switch {
+		case unicode.IsLetter(r):
+			hasLetter = true
+		case unicode.IsDigit(r):
+			hasDigit = true
+		}
+	}
+	var out []utils.FieldError
+	if len([]rune(pw)) < 8 {
+		out = append(out, utils.FieldError{Field: field, Message: "must be at least 8 characters"})
+	}
+	if !hasLetter || !hasDigit {
+		out = append(out, utils.FieldError{Field: field, Message: "must contain both letters and numbers"})
+	}
+	return out
+}
+
+func isValidTimezone(tz string) bool {
+	_, err := time.LoadLocation(tz)
+	return err == nil
 }

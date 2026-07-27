@@ -1,23 +1,25 @@
 BEGIN;
 
-TRUNCATE users, job_applications, application_events, email_tokens, refresh_tokens RESTART IDENTITY CASCADE;
+TRUNCATE users, job_applications, application_events, application_documents, email_tokens, refresh_tokens RESTART IDENTITY CASCADE;
 
-INSERT INTO users (email, password_hash, full_name, avatar_url, timezone, is_verified, is_banned, banned_at, ban_reason, role, last_login_at, created_at, updated_at, deleted_at)
+INSERT INTO users (email, password_hash, auth_provider, full_name, avatar_url, timezone, is_verified, is_banned, banned_at, ban_reason, role, last_login_at, created_at, updated_at, deleted_at)
 VALUES
-    ('verified@example.com',   crypt('Password123', gen_salt('bf', 10)), 'Vera Verified', NULL, 'Asia/Jakarta',    TRUE,  FALSE, NULL,                     NULL,                    'user',  NOW() - INTERVAL '2 days',  NOW() - INTERVAL '200 days', NOW() - INTERVAL '2 days',  NULL),
-    ('unverified@example.com', crypt('Password123', gen_salt('bf', 10)), 'Uma Unverified', NULL, 'Asia/Jakarta',   FALSE, FALSE, NULL,                     NULL,                    'user',  NULL,                       NOW() - INTERVAL '1 day',    NOW() - INTERVAL '1 day',   NULL),
-    ('banned@example.com',     crypt('Password123', gen_salt('bf', 10)), 'Ben Banned', NULL, 'Asia/Jakarta',       TRUE,  TRUE,  NOW() - INTERVAL '5 days', 'Violation of terms',    'user',  NOW() - INTERVAL '10 days', NOW() - INTERVAL '150 days', NOW() - INTERVAL '5 days',  NULL),
-    ('deleted@example.com',    crypt('Password123', gen_salt('bf', 10)), 'Dan Deleted', NULL, 'Asia/Jakarta',      TRUE,  FALSE, NULL,                     NULL,                    'user',  NOW() - INTERVAL '30 days', NOW() - INTERVAL '120 days', NOW() - INTERVAL '30 days', NOW() - INTERVAL '20 days'),
-    ('admin@example.com',      crypt('Password123', gen_salt('bf', 10)), 'Ada Admin', NULL, 'Asia/Jakarta',        TRUE,  FALSE, NULL,                     NULL,                    'admin', NOW() - INTERVAL '1 hour',  NOW() - INTERVAL '300 days', NOW() - INTERVAL '1 hour',  NULL),
-    ('reset@example.com',      crypt('Password123', gen_salt('bf', 10)), 'Rita Reset', NULL, 'Asia/Jakarta',       TRUE,  FALSE, NULL,                     NULL,                    'user',  NOW() - INTERVAL '7 days',  NOW() - INTERVAL '60 days',  NOW() - INTERVAL '7 days',  NULL),
-    ('power@example.com',      crypt('Password123', gen_salt('bf', 10)), 'Pete Power', NULL, 'Asia/Jakarta',       TRUE,  FALSE, NULL,                     NULL,                    'user',  NOW() - INTERVAL '2 hours', NOW() - INTERVAL '365 days', NOW() - INTERVAL '2 hours', NULL);
+    ('verified@example.com',   crypt('Password123', gen_salt('bf', 10)), 'local',  'Vera Verified', NULL, 'Asia/Jakarta',    TRUE,  FALSE, NULL,                     NULL,                    'user',  NOW() - INTERVAL '2 days',  NOW() - INTERVAL '200 days', NOW() - INTERVAL '2 days',  NULL),
+    ('unverified@example.com', crypt('Password123', gen_salt('bf', 10)), 'local',  'Uma Unverified', NULL, 'Asia/Jakarta',   FALSE, FALSE, NULL,                     NULL,                    'user',  NULL,                       NOW() - INTERVAL '1 day',    NOW() - INTERVAL '1 day',   NULL),
+    ('banned@example.com',     crypt('Password123', gen_salt('bf', 10)), 'local',  'Ben Banned', NULL, 'Asia/Jakarta',       TRUE,  TRUE,  NOW() - INTERVAL '5 days', 'Violation of terms',    'user',  NOW() - INTERVAL '10 days', NOW() - INTERVAL '150 days', NOW() - INTERVAL '5 days',  NULL),
+    ('deleted@example.com',    crypt('Password123', gen_salt('bf', 10)), 'local',  'Dan Deleted', NULL, 'Asia/Jakarta',      TRUE,  FALSE, NULL,                     NULL,                    'user',  NOW() - INTERVAL '30 days', NOW() - INTERVAL '120 days', NOW() - INTERVAL '30 days', NOW() - INTERVAL '20 days'),
+    ('admin@example.com',      crypt('Password123', gen_salt('bf', 10)), 'local',  'Ada Admin', NULL, 'Asia/Jakarta',        TRUE,  FALSE, NULL,                     NULL,                    'admin', NOW() - INTERVAL '1 hour',  NOW() - INTERVAL '300 days', NOW() - INTERVAL '1 hour',  NULL),
+    ('google@example.com',     NULL,                                      'google', 'Gina Google', 'https://i.pravatar.cc/150?u=google', 'America/New_York', TRUE, FALSE, NULL,          NULL,                    'user',  NOW() - INTERVAL '3 days',  NOW() - INTERVAL '90 days',  NOW() - INTERVAL '3 days',  NULL),
+    ('reset@example.com',      crypt('Password123', gen_salt('bf', 10)), 'local',  'Rita Reset', NULL, 'Asia/Jakarta',       TRUE,  FALSE, NULL,                     NULL,                    'user',  NOW() - INTERVAL '7 days',  NOW() - INTERVAL '60 days',  NOW() - INTERVAL '7 days',  NULL),
+    ('power@example.com',      crypt('Password123', gen_salt('bf', 10)), 'local',  'Pete Power', NULL, 'Asia/Jakarta',       TRUE,  FALSE, NULL,                     NULL,                    'user',  NOW() - INTERVAL '2 hours', NOW() - INTERVAL '365 days', NOW() - INTERVAL '2 hours', NULL);
 
-INSERT INTO users (email, password_hash, full_name, avatar_url, timezone, is_verified, is_banned, banned_at, ban_reason, role, last_login_at, created_at, updated_at, deleted_at)
+INSERT INTO users (email, password_hash, auth_provider, full_name, avatar_url, timezone, is_verified, is_banned, banned_at, ban_reason, role, last_login_at, created_at, updated_at, deleted_at)
 SELECT
     'user' || g || '@example.com',
-    crypt('Password123', gen_salt('bf', 10)),
+    CASE WHEN prov = 'google' THEN NULL ELSE crypt('Password123', gen_salt('bf', 10)) END,
+    prov::auth_provider,
     fname || ' ' || lname,
-    NULL,
+    CASE WHEN prov = 'google' THEN 'https://i.pravatar.cc/150?u=' || g ELSE NULL END,
     tz,
     NOT (b BETWEEN 65 AND 79),
     (b BETWEEN 80 AND 90),
@@ -32,6 +34,7 @@ FROM (
     SELECT
         g,
         floor(random() * 100)::int AS b,
+        (ARRAY['local','local','local','local','local','local','local','google'])[(1 + floor(random() * 8))::int] AS prov,
         (NOW() - (random() * INTERVAL '700 days')) AS created,
         (ARRAY['Asia/Jakarta','Asia/Makassar','America/New_York','Europe/London','Asia/Singapore','Australia/Sydney','Asia/Tokyo'])[(1 + floor(random() * 7))::int] AS tz,
         (ARRAY['Andi','Budi','Citra','Dewi','Eka','Fajar','Gita','Hadi','Indah','Joko','Kartika','Lina','Made','Nadia','Oki','Putri','Rian','Sari','Tono','Umar','Vina','Wawan','Yanti','Zaki'])[(1 + floor(random() * 24))::int] AS fname,
@@ -146,25 +149,39 @@ FROM (
     WHERE a.deleted_at IS NULL
 ) ev_seed;
 
+INSERT INTO application_documents (application_id, user_id, file_url, file_name, mime_type, size_bytes, created_at, deleted_at)
+SELECT
+    a.id,
+    a.user_id,
+    'https://files.example.com/' || encode(gen_random_bytes(8), 'hex') || '.pdf',
+    (ARRAY['resume.pdf','cover_letter.pdf','portfolio.pdf','offer_letter.pdf','transcript.pdf','reference.pdf'])[(1 + floor(random() * 6))::int],
+    'application/pdf',
+    (50000 + floor(random() * 2000000))::bigint,
+    a.created_at + (random() * INTERVAL '5 days'),
+    CASE WHEN random() < 0.15 THEN a.created_at + (random() * INTERVAL '20 days') ELSE NULL END
+FROM job_applications a
+CROSS JOIN LATERAL generate_series(1, floor(random() * 3)::int) AS n
+WHERE a.deleted_at IS NULL;
+
 INSERT INTO email_tokens (user_id, type, token_hash, expires_at, used_at, created_at)
 SELECT u.id, 'verify', encode(gen_random_bytes(16), 'hex'), NOW() + INTERVAL '24 hours', NULL, u.created_at
 FROM users u
-WHERE u.is_verified = FALSE AND u.deleted_at IS NULL;
+WHERE u.auth_provider = 'local' AND u.is_verified = FALSE AND u.deleted_at IS NULL;
 
 INSERT INTO email_tokens (user_id, type, token_hash, expires_at, used_at, created_at)
 SELECT u.id, 'verify', encode(gen_random_bytes(16), 'hex'), u.created_at + INTERVAL '24 hours', u.created_at + INTERVAL '1 hour', u.created_at
 FROM users u
-WHERE u.is_verified = TRUE AND u.deleted_at IS NULL AND random() < 0.5;
+WHERE u.auth_provider = 'local' AND u.is_verified = TRUE AND u.deleted_at IS NULL AND random() < 0.5;
 
 INSERT INTO email_tokens (user_id, type, token_hash, expires_at, used_at, created_at)
 SELECT u.id, 'reset', encode(gen_random_bytes(16), 'hex'), NOW() + INTERVAL '1 hour', NULL, NOW() - INTERVAL '10 minutes'
 FROM users u
-WHERE u.email = 'reset@example.com' OR (u.is_verified = TRUE AND u.deleted_at IS NULL AND random() < 0.1);
+WHERE u.email = 'reset@example.com' OR (u.auth_provider = 'local' AND u.is_verified = TRUE AND u.deleted_at IS NULL AND random() < 0.1);
 
 INSERT INTO email_tokens (user_id, type, token_hash, expires_at, used_at, created_at)
 SELECT u.id, 'reset', encode(gen_random_bytes(16), 'hex'), u.created_at + INTERVAL '1 hour', u.created_at + INTERVAL '20 minutes', u.created_at
 FROM users u
-WHERE u.is_verified = TRUE AND u.deleted_at IS NULL AND random() < 0.1;
+WHERE u.auth_provider = 'local' AND u.is_verified = TRUE AND u.deleted_at IS NULL AND random() < 0.1;
 
 INSERT INTO refresh_tokens (user_id, token_hash, expires_at, revoked_at, created_at)
 SELECT
@@ -185,6 +202,7 @@ UNION ALL SELECT 'users_verified_active', count(*) FROM users WHERE is_verified 
 UNION ALL SELECT 'users_unverified', count(*) FROM users WHERE NOT is_verified AND deleted_at IS NULL
 UNION ALL SELECT 'users_banned', count(*) FROM users WHERE is_banned
 UNION ALL SELECT 'users_soft_deleted', count(*) FROM users WHERE deleted_at IS NOT NULL
+UNION ALL SELECT 'users_google', count(*) FROM users WHERE auth_provider = 'google'
 UNION ALL SELECT 'job_applications_total', count(*) FROM job_applications
 UNION ALL SELECT 'job_applications_active', count(*) FROM job_applications WHERE deleted_at IS NULL
 UNION ALL SELECT 'job_applications_edited', count(*) FROM job_applications WHERE updated_at > created_at
@@ -192,6 +210,7 @@ UNION ALL SELECT 'job_applications_archived', count(*) FROM job_applications WHE
 UNION ALL SELECT 'job_applications_soft_deleted', count(*) FROM job_applications WHERE deleted_at IS NOT NULL
 UNION ALL SELECT 'application_events_total', count(*) FROM application_events
 UNION ALL SELECT 'application_events_pending_reminder', count(*) FROM application_events WHERE remind_at IS NOT NULL AND reminded_at IS NULL
+UNION ALL SELECT 'application_documents_total', count(*) FROM application_documents
 UNION ALL SELECT 'email_tokens_total', count(*) FROM email_tokens
 UNION ALL SELECT 'refresh_tokens_active', count(*) FROM refresh_tokens WHERE revoked_at IS NULL AND expires_at > NOW()
 UNION ALL SELECT 'refresh_tokens_revoked', count(*) FROM refresh_tokens WHERE revoked_at IS NOT NULL
