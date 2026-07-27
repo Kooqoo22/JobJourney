@@ -1,19 +1,22 @@
 package utils
 
-import (
-	"encoding/base64"
-	"encoding/json"
-)
-
 const (
 	DefaultLimit = 20
 	MaxLimit     = 100
 )
 
-type CursorMeta struct {
-	NextCursor string `json:"next_cursor,omitempty"`
-	HasNext    bool   `json:"has_next"`
-	Limit      int    `json:"limit"`
+type PageMeta struct {
+	Total      int64 `json:"total"`
+	Page       int   `json:"page"`
+	Limit      int   `json:"limit"`
+	TotalPages int   `json:"total_pages"`
+}
+
+func NormalizePage(page int) int {
+	if page <= 0 {
+		return 1
+	}
+	return page
 }
 
 func NormalizeLimit(limit int) int {
@@ -26,18 +29,10 @@ func NormalizeLimit(limit int) int {
 	return limit
 }
 
-func EncodeCursor(payload any) (string, error) {
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return "", err
+func NewPageMeta(total int64, page, limit int) PageMeta {
+	totalPages := int((total + int64(limit) - 1) / int64(limit))
+	if totalPages == 0 {
+		totalPages = 1
 	}
-	return base64.URLEncoding.EncodeToString(raw), nil
-}
-
-func DecodeCursor(cursor string, dst any) error {
-	raw, err := base64.URLEncoding.DecodeString(cursor)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(raw, dst)
+	return PageMeta{Total: total, Page: page, Limit: limit, TotalPages: totalPages}
 }
