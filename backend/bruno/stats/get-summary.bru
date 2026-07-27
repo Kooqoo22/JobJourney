@@ -1,0 +1,33 @@
+meta {
+  name: Get Dashboard Summary
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/stats/summary
+  auth: bearer
+}
+
+headers {
+  X-Timezone: {{timezone}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## Description
+  Dashboard summary: total application count and count per status (non-archived, non-deleted), upcoming events within the next 7 days (up to 10), and 5 most recently updated applications.
+
+  ## Responses
+  ### 200 OK
+  { "message": "summary retrieved", "data": { "totals": { "all": 42, "by_status": { "applied": 10, "interview": 5, "offer": 2, "accepted": 1 } }, "upcoming_events": [ { "id": 3, "application_id": 1, "type": "interview", "title": "Technical Interview", "event_at": "2026-07-15T10:00:00+07:00" } ], "recent_applications": [ { "id": 1, "company_name": "Acme Corp", "position_title": "Backend Engineer", "status": "interview", "updated_at": "2026-07-09T12:00:00+07:00" } ] } }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}
