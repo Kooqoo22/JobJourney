@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/shopspring/decimal"
 
 	"github.com/Kooqoo22/JobJourney/backend/internal/application/entity"
 	"github.com/Kooqoo22/JobJourney/backend/internal/database"
@@ -52,144 +54,20 @@ func (r *ApplicationRepository) GetByID(ctx context.Context, id, userID int64) (
 	query := `SELECT * FROM job_applications WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`
 	if err := sqlx.GetContext(ctx, exec, &a, query, id, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return entity.Application{}, entity.ErrNotFound
+			return entity.Application{}, ErrNotFound
 		}
 		return entity.Application{}, err
 	}
 	return a, nil
 }
 
-func (r *ApplicationRepository) Update(ctx context.Context, a *entity.Application) (err error) {
-	exec := database.GetDBTx(ctx, r.db)
-	query := `
-		UPDATE job_applications
-		SET company_name = :company_name,
-		    position_title = :position_title,
-		    job_url = :job_url,
-		    work_arrangement = :work_arrangement,
-		    employment_type = :employment_type,
-		    location = :location,
-		    source = :source,
-		    status = :status,
-		    applied_date = :applied_date,
-		    salary_min = :salary_min,
-		    salary_max = :salary_max,
-		    currency = :currency,
-		    notes = :notes,
-		    updated_at = NOW()
-		WHERE id = :id AND user_id = :user_id AND deleted_at IS NULL
-		RETURNING updated_at`
-	rows, err := sqlx.NamedQueryContext(ctx, exec, query, a)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if cerr := rows.Close(); err == nil {
-			err = cerr
-		}
-	}()
-	if rows.Next() {
-		return rows.Scan(&a.UpdatedAt)
-	}
-	return rows.Err()
-}
-
-func (r *ApplicationRepository) SoftDeleteApplication(ctx context.Context, id, userID int64) error {
-	exec := database.GetDBTx(ctx, r.db)
-	res, err := exec.ExecContext(ctx,
-		`UPDATE job_applications SET deleted_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
-		id, userID)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return entity.ErrNotFound
-	}
-	return nil
-}
-
-func (r *ApplicationRepository) SoftDeleteApplicationEvents(ctx context.Context, applicationID int64) error {
-	exec := database.GetDBTx(ctx, r.db)
-	_, err := exec.ExecContext(ctx,
-		`UPDATE application_events SET deleted_at = NOW() WHERE application_id = $1 AND deleted_at IS NULL`,
-		applicationID)
-	return err
-}
-
-func (r *ApplicationRepository) SetArchived(ctx context.Context, id, userID int64, isArchived bool) error {
-	exec := database.GetDBTx(ctx, r.db)
-	res, err := exec.ExecContext(ctx,
-		`UPDATE job_applications SET is_archived = $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
-		id, userID, isArchived)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return entity.ErrNotFound
-	}
-	return nil
-}
-
-func (r *ApplicationRepository) UpdateStatus(ctx context.Context, id, userID int64, status string) (entity.Application, error) {
-	exec := database.GetDBTx(ctx, r.db)
-	var a entity.Application
-	query := `
-		UPDATE job_applications
-		SET status = $3, updated_at = NOW()
-		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-		RETURNING *`
-	if err := sqlx.GetContext(ctx, exec, &a, query, id, userID, status); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return entity.Application{}, entity.ErrNotFound
-		}
-		return entity.Application{}, err
-	}
-	return a, nil
-}
-
-func (r *ApplicationRepository) GetDeletedByID(ctx context.Context, id, userID int64) (entity.Application, error) {
-	exec := database.GetDBTx(ctx, r.db)
-	var a entity.Application
-	query := `SELECT * FROM job_applications WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL`
-	if err := sqlx.GetContext(ctx, exec, &a, query, id, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return entity.Application{}, entity.ErrNotFound
-		}
-		return entity.Application{}, err
-	}
-	return a, nil
-}
-
-func (r *ApplicationRepository) RestoreApplication(ctx context.Context, id, userID int64) (entity.Application, error) {
-	exec := database.GetDBTx(ctx, r.db)
-	var a entity.Application
-	query := `
-		UPDATE job_applications
-		SET deleted_at = NULL, updated_at = NOW()
-		WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL
-		RETURNING *`
-	if err := sqlx.GetContext(ctx, exec, &a, query, id, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return entity.Application{}, entity.ErrNotFound
-		}
-		return entity.Application{}, err
-	}
-	return a, nil
-}
+var ErrNotFound = errors.New("application not found")
 
 var validSortBy = map[string]bool{
 	"updated_at": true, "applied_date": true, "company_name": true, "status": true,
 }
 
-func (r *ApplicationRepository) List(ctx context.Context, userID int64, f entity.ApplicationListFilter) ([]entity.Application, int64, error) {
+func (r *ApplicationRepository) List(ctx context.Context, userID int64, f entity.ApplicationListFilter) ([]entity.Application, error) {
 	exec := database.GetDBTx(ctx, r.db)
 
 	args := []interface{}{userID}
@@ -249,37 +127,79 @@ func (r *ApplicationRepository) List(ctx context.Context, userID int64, f entity
 		dir = "DESC"
 	}
 
+	if f.CursorID != nil && f.CursorSortVal != nil {
+		op := "<"
+		if dir == "ASC" {
+			op = ">"
+		}
+		switch sortBy {
+		case "updated_at":
+			where = append(where, fmt.Sprintf("(updated_at, id) %s ($%d::timestamptz, $%d)", op, n, n+1))
+		case "applied_date":
+			sentinel := "1970-01-01"
+			if dir == "ASC" {
+				sentinel = "9999-12-31"
+			}
+			where = append(where, fmt.Sprintf("(COALESCE(applied_date, '%s'::date), id) %s ($%d::date, $%d)", sentinel, op, n, n+1))
+		default:
+			where = append(where, fmt.Sprintf("(%s, id) %s ($%d, $%d)", sortBy, op, n, n+1))
+		}
+		args = append(args, *f.CursorSortVal, *f.CursorID)
+		n += 2
+	}
+
 	var orderExpr string
-	if sortBy == "applied_date" {
+	switch sortBy {
+	case "applied_date":
 		sentinel := "1970-01-01"
 		if dir == "ASC" {
 			sentinel = "9999-12-31"
 		}
 		orderExpr = fmt.Sprintf("COALESCE(applied_date, '%s'::date) %s, id %s", sentinel, dir, dir)
-	} else {
+	default:
 		orderExpr = fmt.Sprintf("%s %s, id %s", sortBy, dir, dir)
 	}
 
-	whereClause := strings.Join(where, " AND ")
-
-	var total int64
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM job_applications WHERE %s", whereClause)
-	if err := sqlx.GetContext(ctx, exec, &total, countQuery, args...); err != nil {
-		return nil, 0, err
-	}
-
-	args = append(args, f.Limit, f.Offset)
-	dataQuery := fmt.Sprintf(`
+	args = append(args, f.Limit)
+	query := fmt.Sprintf(`
 		SELECT * FROM job_applications
 		WHERE %s
 		ORDER BY %s
-		LIMIT $%d OFFSET $%d`,
-		whereClause, orderExpr, n, n+1,
+		LIMIT $%d`,
+		strings.Join(where, " AND "),
+		orderExpr,
+		n,
 	)
 
 	var apps []entity.Application
-	if err := sqlx.SelectContext(ctx, exec, &apps, dataQuery, args...); err != nil {
-		return nil, 0, err
+	if err := sqlx.SelectContext(ctx, exec, &apps, query, args...); err != nil {
+		return nil, err
 	}
-	return apps, total, nil
+	return apps, nil
+}
+
+func parseSalary(s *string) (*decimal.Decimal, error) {
+	if s == nil {
+		return nil, nil
+	}
+	d, err := decimal.NewFromString(*s)
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func ParseAppliedDate(s *string) (*time.Time, error) {
+	if s == nil {
+		return nil, nil
+	}
+	t, err := time.Parse("2006-01-02", *s)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+func ParseSalary(s *string) (*decimal.Decimal, error) {
+	return parseSalary(s)
 }

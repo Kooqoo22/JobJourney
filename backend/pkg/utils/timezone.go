@@ -9,8 +9,3 @@ func ToLocal(t time.Time, tz string) time.Time {
 	}
 	return t.In(loc)
 }
-
-func IsValidTimezone(tz string) bool {
-	_, err := time.LoadLocation(tz)
-	return err == nil
-}

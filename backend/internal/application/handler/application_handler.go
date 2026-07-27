@@ -18,44 +18,6 @@ func New(uc ApplicationUsecaseIface) *ApplicationHandler {
 	return &ApplicationHandler{usecase: uc}
 }
 
-func (h *ApplicationHandler) DeleteApplication(c *gin.Context) {
-	var param dto.ApplicationIDParam
-	if err := c.ShouldBindUri(&param); err != nil {
-		c.Error(err)
-		return
-	}
-	userID := c.GetInt64(middleware.ContextUserID)
-	if err := h.usecase.DeleteApplication(c.Request.Context(), param.ID, userID); err != nil {
-		c.Error(err)
-		return
-	}
-	c.JSON(http.StatusOK, utils.NewMessage("application deleted"))
-}
-
-func (h *ApplicationHandler) UpdateApplication(c *gin.Context) {
-	var param dto.ApplicationIDParam
-	if err := c.ShouldBindUri(&param); err != nil {
-		c.Error(err)
-		return
-	}
-	var req dto.UpdateApplicationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.Error(err)
-		return
-	}
-	userID := c.GetInt64(middleware.ContextUserID)
-	tz := c.GetHeader("X-Timezone")
-	if tz == "" {
-		tz = "Asia/Jakarta"
-	}
-	resp, err := h.usecase.UpdateApplication(c.Request.Context(), param.ID, userID, tz, req)
-	if err != nil {
-		c.Error(err)
-		return
-	}
-	c.JSON(http.StatusOK, utils.NewSuccess("application updated", resp))
-}
-
 func (h *ApplicationHandler) GetApplication(c *gin.Context) {
 	var param dto.ApplicationIDParam
 	if err := c.ShouldBindUri(&param); err != nil {
