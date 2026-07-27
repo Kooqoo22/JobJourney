@@ -11,6 +11,6 @@ type ListApplicationsQuery struct {
 	IsArchived      *bool  `form:"is_archived"`
 	SortBy          string `form:"sort_by"`
 	SortDir         string `form:"sort_dir"`
-	Page            int    `form:"page"`
+	Cursor          string `form:"cursor"`
 	Limit           int    `form:"limit"`
 }
