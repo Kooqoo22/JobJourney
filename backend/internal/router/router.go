@@ -12,6 +12,9 @@ import (
 	authusecase "github.com/Kooqoo22/JobJourney/backend/internal/auth/usecase"
 	"github.com/Kooqoo22/JobJourney/backend/internal/database"
 	"github.com/Kooqoo22/JobJourney/backend/internal/middleware"
+	apphandler "github.com/Kooqoo22/JobJourney/backend/internal/application/handler"
+	apprepo "github.com/Kooqoo22/JobJourney/backend/internal/application/repository"
+	appusecase "github.com/Kooqoo22/JobJourney/backend/internal/application/usecase"
 	profilehandler "github.com/Kooqoo22/JobJourney/backend/internal/profile/handler"
 	profilerepo "github.com/Kooqoo22/JobJourney/backend/internal/profile/repository"
 	profileusecase "github.com/Kooqoo22/JobJourney/backend/internal/profile/usecase"
@@ -52,11 +55,13 @@ func registerRoutes(rg *gin.RouterGroup, deps Dependencies) {
 	authMW := middleware.Auth(deps.Token)
 	registerAuthRoutes(rg, deps)
 	registerProfileRoutes(rg, deps, authMW)
+	registerApplicationRoutes(rg, deps, authMW)
 }
 
 func registerProfileRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.HandlerFunc) {
 	repo := profilerepo.New(deps.DB)
-	uc := profileusecase.New(repo)
+	tx := database.NewTxManager(deps.DB)
+	uc := profileusecase.New(repo, tx)
 	h := profilehandler.New(uc)
 
 	profile := rg.Group("/profile", authMW)
@@ -64,6 +69,17 @@ func registerProfileRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.Ha
 	profile.PUT("", h.UpdateProfile)
 	profile.PATCH("/password", h.ChangePassword)
 	profile.PATCH("/preferences", h.UpdatePreferences)
+	profile.DELETE("", h.DeleteAccount)
+}
+
+func registerApplicationRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.HandlerFunc) {
+	repo := apprepo.New(deps.DB)
+	tx := database.NewTxManager(deps.DB)
+	uc := appusecase.New(repo, tx)
+	h := apphandler.New(uc)
+
+	apps := rg.Group("/applications", authMW)
+	apps.POST("", h.CreateApplication)
 }
 
 func registerAuthRoutes(rg *gin.RouterGroup, deps Dependencies) {

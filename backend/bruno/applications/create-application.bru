@@ -1,0 +1,59 @@
+meta {
+  name: Create Application
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/applications
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  X-Timezone: {{timezone}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "company_name": "Acme Corp",
+    "position_title": "Backend Engineer",
+    "job_url": "https://jobs.acme.com/123",
+    "work_arrangement": "remote",
+    "employment_type": "full_time",
+    "location": "Jakarta",
+    "source": "LinkedIn",
+    "status": "applied",
+    "applied_date": "2026-07-01",
+    "salary_min": "8000000.00",
+    "salary_max": "12000000.00",
+    "currency": "IDR",
+    "notes": "Referred by John"
+  }
+}
+
+docs {
+  ## Description
+  Creates a new job application for the authenticated user. If status is not wishlist and applied_date is provided, it must not be in the future. An application_events entry of type applied is auto-created when status is not wishlist.
+
+  ## Responses
+  ### 201 Created
+  { "message": "application created", "data": { "id": 1, "company_name": "Acme Corp", "position_title": "Backend Engineer", "status": "applied", "is_archived": false, "created_at": "2026-07-09T10:00:00+07:00", "updated_at": "2026-07-09T10:00:00+07:00" } }
+
+  ### 400 Bad Request
+  { "message": "invalid request body" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 422 Unprocessable Entity
+  { "message": "validation failed", "errors": [ { "field": "salary_min", "message": "must be less than or equal to salary_max" } ] }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}

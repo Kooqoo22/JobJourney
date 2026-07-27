@@ -1,0 +1,16 @@
+package usecase
+
+import (
+	"context"
+
+	"github.com/Kooqoo22/JobJourney/backend/internal/application/entity"
+)
+
+type ApplicationRepoIface interface {
+	Insert(ctx context.Context, a *entity.Application) error
+	GetByID(ctx context.Context, id, userID int64) (entity.Application, error)
+}
+
+type TxManagerIface interface {
+	WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error
+}
