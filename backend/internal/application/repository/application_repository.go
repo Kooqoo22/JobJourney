@@ -59,6 +59,41 @@ func (r *ApplicationRepository) GetByID(ctx context.Context, id, userID int64) (
 	return a, nil
 }
 
+func (r *ApplicationRepository) Update(ctx context.Context, a *entity.Application) (err error) {
+	exec := database.GetDBTx(ctx, r.db)
+	query := `
+		UPDATE job_applications
+		SET company_name = :company_name,
+		    position_title = :position_title,
+		    job_url = :job_url,
+		    work_arrangement = :work_arrangement,
+		    employment_type = :employment_type,
+		    location = :location,
+		    source = :source,
+		    status = :status,
+		    applied_date = :applied_date,
+		    salary_min = :salary_min,
+		    salary_max = :salary_max,
+		    currency = :currency,
+		    notes = :notes,
+		    updated_at = NOW()
+		WHERE id = :id AND user_id = :user_id AND deleted_at IS NULL
+		RETURNING updated_at`
+	rows, err := sqlx.NamedQueryContext(ctx, exec, query, a)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := rows.Close(); err == nil {
+			err = cerr
+		}
+	}()
+	if rows.Next() {
+		return rows.StructScan(a)
+	}
+	return rows.Err()
+}
+
 var validSortBy = map[string]bool{
 	"updated_at": true, "applied_date": true, "company_name": true, "status": true,
 }
