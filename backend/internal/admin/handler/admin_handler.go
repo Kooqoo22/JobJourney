@@ -68,3 +68,17 @@ func (h *AdminHandler) UnbanUser(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, utils.NewMessage("user unbanned"))
 }
+
+func (h *AdminHandler) DeleteUser(c *gin.Context) {
+	var param adminDto.UserIDParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	adminID := c.GetInt64(middleware.ContextUserID)
+	if err := h.usecase.DeleteUser(c.Request.Context(), adminID, param.ID); err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewMessage("user deleted"))
+}

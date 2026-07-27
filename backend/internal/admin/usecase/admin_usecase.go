@@ -84,6 +84,29 @@ func (u *AdminUsecase) UnbanUser(ctx context.Context, adminID, userID int64) err
 	return nil
 }
 
+func (u *AdminUsecase) DeleteUser(ctx context.Context, adminID, userID int64) error {
+	if adminID == userID {
+		return utils.ErrUnprocessable("validation failed", []utils.FieldError{
+			{Field: "id", Message: "cannot delete yourself"},
+		})
+	}
+	if _, err := u.repo.GetUserByID(ctx, userID); err != nil {
+		if isNotFound(err) {
+			return utils.ErrNotFound("user not found")
+		}
+		return utils.ErrInternal(err)
+	}
+	return u.tx.WithTransaction(ctx, func(txCtx context.Context) error {
+		if err := u.repo.SoftDeleteUserData(txCtx, userID); err != nil {
+			return utils.ErrInternal(err)
+		}
+		if err := u.repo.SoftDeleteUser(txCtx, userID); err != nil {
+			return utils.ErrInternal(err)
+		}
+		return nil
+	})
+}
+
 func isNotFound(err error) bool {
 	return err == authEntity.ErrUserNotFound
 }
