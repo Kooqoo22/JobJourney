@@ -2,10 +2,12 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jmoiron/sqlx"
 
 	appEntity "github.com/Kooqoo22/JobJourney/backend/internal/application/entity"
+	statsDto "github.com/Kooqoo22/JobJourney/backend/internal/stats/dto"
 )
 
 type StatsRepository struct {
@@ -67,4 +69,103 @@ func (r *StatsRepository) GetRecentApplications(ctx context.Context, userID int6
 		return nil, err
 	}
 	return apps, nil
+}
+
+type rateRow struct {
+	TotalApplied int64 `db:"total_applied"`
+	Responded    int64 `db:"responded"`
+	Interviewed  int64 `db:"interviewed"`
+	Offered      int64 `db:"offered"`
+}
+
+func (r *StatsRepository) GetApplicationRates(ctx context.Context, userID int64) (statsDto.RatesResult, error) {
+	var row rateRow
+	query := `
+		SELECT
+			COUNT(*) FILTER (WHERE status NOT IN ('wishlist')) AS total_applied,
+			COUNT(*) FILTER (WHERE status IN ('screening', 'interview', 'offer', 'accepted', 'rejected', 'withdrawn')) AS responded,
+			COUNT(*) FILTER (WHERE status IN ('interview', 'offer', 'accepted')) AS interviewed,
+			COUNT(*) FILTER (WHERE status IN ('offer', 'accepted')) AS offered
+		FROM job_applications
+		WHERE user_id = $1 AND deleted_at IS NULL`
+	if err := r.db.GetContext(ctx, &row, query, userID); err != nil {
+		return statsDto.RatesResult{}, err
+	}
+	return statsDto.RatesResult{
+		TotalApplied: row.TotalApplied,
+		Responded:    row.Responded,
+		Interviewed:  row.Interviewed,
+		Offered:      row.Offered,
+	}, nil
+}
+
+func (r *StatsRepository) GetFunnel(ctx context.Context, userID int64) ([]statsDto.FunnelItem, error) {
+	var items []statsDto.FunnelItem
+	query := `
+		SELECT status, COUNT(*) AS count
+		FROM job_applications
+		WHERE user_id = $1 AND deleted_at IS NULL
+		GROUP BY status
+		ORDER BY
+			CASE status
+				WHEN 'wishlist' THEN 1
+				WHEN 'applied' THEN 2
+				WHEN 'screening' THEN 3
+				WHEN 'interview' THEN 4
+				WHEN 'offer' THEN 5
+				WHEN 'accepted' THEN 6
+				WHEN 'rejected' THEN 7
+				WHEN 'withdrawn' THEN 8
+				WHEN 'ghosted' THEN 9
+				ELSE 10
+			END`
+	if err := r.db.SelectContext(ctx, &items, query, userID); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *StatsRepository) GetTrend(ctx context.Context, userID int64, period string) ([]statsDto.TrendItem, error) {
+	var format string
+	var interval string
+	switch period {
+	case "week":
+		format = `TO_CHAR(created_at AT TIME ZONE 'UTC', 'IYYY-"W"IW')`
+		interval = "13 weeks"
+	case "quarter":
+		format = `TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-"Q"Q')`
+		interval = "4 quarters"
+	case "year":
+		format = `TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY')`
+		interval = "5 years"
+	default:
+		format = `TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM')`
+		interval = "12 months"
+	}
+	query := fmt.Sprintf(`
+		SELECT %s AS period, COUNT(*) AS count
+		FROM job_applications
+		WHERE user_id = $1 AND deleted_at IS NULL AND created_at >= NOW() - INTERVAL '%s'
+		GROUP BY period
+		ORDER BY period`, format, interval)
+
+	var items []statsDto.TrendItem
+	if err := r.db.SelectContext(ctx, &items, query, userID); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *StatsRepository) GetBySource(ctx context.Context, userID int64) ([]statsDto.SourceItem, error) {
+	var items []statsDto.SourceItem
+	query := `
+		SELECT COALESCE(source, 'unknown') AS source, COUNT(*) AS count
+		FROM job_applications
+		WHERE user_id = $1 AND deleted_at IS NULL
+		GROUP BY source
+		ORDER BY count DESC`
+	if err := r.db.SelectContext(ctx, &items, query, userID); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

@@ -8,4 +8,5 @@ import (
 
 type StatsUsecaseIface interface {
 	GetSummary(ctx context.Context, userID int64, userTZ string) (statsDto.SummaryResponse, error)
+	GetAnalytics(ctx context.Context, userID int64, period string) (statsDto.AnalyticsResponse, error)
 }

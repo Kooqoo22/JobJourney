@@ -53,3 +53,56 @@ func (u *StatsUsecase) GetSummary(ctx context.Context, userID int64, userTZ stri
 
 	return summary, nil
 }
+
+func (u *StatsUsecase) GetAnalytics(ctx context.Context, userID int64, period string) (statsDto.AnalyticsResponse, error) {
+	validPeriods := map[string]bool{"week": true, "month": true, "quarter": true, "year": true}
+	if !validPeriods[period] {
+		period = "month"
+	}
+
+	funnel, err := u.repo.GetFunnel(ctx, userID)
+	if err != nil {
+		return statsDto.AnalyticsResponse{}, utils.ErrInternal(err)
+	}
+
+	rates, err := u.repo.GetApplicationRates(ctx, userID)
+	if err != nil {
+		return statsDto.AnalyticsResponse{}, utils.ErrInternal(err)
+	}
+
+	trend, err := u.repo.GetTrend(ctx, userID, period)
+	if err != nil {
+		return statsDto.AnalyticsResponse{}, utils.ErrInternal(err)
+	}
+
+	bySource, err := u.repo.GetBySource(ctx, userID)
+	if err != nil {
+		return statsDto.AnalyticsResponse{}, utils.ErrInternal(err)
+	}
+
+	var responseRate, interviewRate, offerRate float64
+	if rates.TotalApplied > 0 {
+		responseRate = float64(rates.Responded) / float64(rates.TotalApplied)
+		interviewRate = float64(rates.Interviewed) / float64(rates.TotalApplied)
+		offerRate = float64(rates.Offered) / float64(rates.TotalApplied)
+	}
+
+	if funnel == nil {
+		funnel = []statsDto.FunnelItem{}
+	}
+	if trend == nil {
+		trend = []statsDto.TrendItem{}
+	}
+	if bySource == nil {
+		bySource = []statsDto.SourceItem{}
+	}
+
+	return statsDto.AnalyticsResponse{
+		Funnel:        funnel,
+		ResponseRate:  responseRate,
+		InterviewRate: interviewRate,
+		OfferRate:     offerRate,
+		Trend:         trend,
+		BySource:      bySource,
+	}, nil
+}

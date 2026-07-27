@@ -69,6 +69,7 @@ func registerStatsRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.Hand
 
 	stats := rg.Group("/stats", authMW)
 	stats.GET("/summary", h.GetSummary)
+	stats.GET("/applications", h.GetAnalytics)
 }
 
 func registerProfileRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.HandlerFunc) {
