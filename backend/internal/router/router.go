@@ -15,6 +15,9 @@ import (
 	apphandler "github.com/Kooqoo22/JobJourney/backend/internal/application/handler"
 	apprepo "github.com/Kooqoo22/JobJourney/backend/internal/application/repository"
 	appusecase "github.com/Kooqoo22/JobJourney/backend/internal/application/usecase"
+	adminhandler "github.com/Kooqoo22/JobJourney/backend/internal/admin/handler"
+	adminrepo "github.com/Kooqoo22/JobJourney/backend/internal/admin/repository"
+	adminusecase "github.com/Kooqoo22/JobJourney/backend/internal/admin/usecase"
 	statshandler "github.com/Kooqoo22/JobJourney/backend/internal/stats/handler"
 	statsrepo "github.com/Kooqoo22/JobJourney/backend/internal/stats/repository"
 	statsusecase "github.com/Kooqoo22/JobJourney/backend/internal/stats/usecase"
@@ -60,6 +63,16 @@ func registerRoutes(rg *gin.RouterGroup, deps Dependencies) {
 	registerProfileRoutes(rg, deps, authMW)
 	registerApplicationRoutes(rg, deps, authMW)
 	registerStatsRoutes(rg, deps, authMW)
+	registerAdminRoutes(rg, deps, authMW)
+}
+
+func registerAdminRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.HandlerFunc) {
+	repo := adminrepo.New(deps.DB)
+	uc := adminusecase.New(repo)
+	h := adminhandler.New(uc)
+
+	adminGroup := rg.Group("/admin", authMW, middleware.RequireRole("admin"))
+	adminGroup.GET("/users", h.ListUsers)
 }
 
 func registerStatsRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.HandlerFunc) {
