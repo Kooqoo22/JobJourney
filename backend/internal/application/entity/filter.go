@@ -11,7 +11,6 @@ type ApplicationListFilter struct {
 	IsArchived      *bool
 	SortBy          string
 	SortDir         string
-	CursorSortVal   *string
-	CursorID        *int64
+	Offset          int
 	Limit           int
 }

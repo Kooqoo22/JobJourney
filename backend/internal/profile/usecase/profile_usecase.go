@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/Kooqoo22/JobJourney/backend/internal/auth/entity"
 	"github.com/Kooqoo22/JobJourney/backend/internal/profile/dto"
@@ -42,7 +41,7 @@ func (u *ProfileUsecase) UpdateProfile(ctx context.Context, userID int64, req dt
 	}
 
 	if req.Timezone != nil {
-		if !isValidTimezone(*req.Timezone) {
+		if !utils.IsValidTimezone(*req.Timezone) {
 			return dto.ProfileResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
 				{Field: "timezone", Message: "must be a valid IANA timezone"},
 			})
@@ -73,7 +72,7 @@ func (u *ProfileUsecase) UpdateProfile(ctx context.Context, userID int64, req dt
 }
 
 func (u *ProfileUsecase) ChangePassword(ctx context.Context, userID int64, req dto.ChangePasswordRequest) error {
-	if fields := passwordStrengthErrors(req.NewPassword); fields != nil {
+	if fields := security.PasswordStrengthErrors("new_password", req.NewPassword); fields != nil {
 		return utils.ErrUnprocessable("password does not meet the requirements", fields)
 	}
 
@@ -85,10 +84,7 @@ func (u *ProfileUsecase) ChangePassword(ctx context.Context, userID int64, req d
 		return utils.ErrInternal(err)
 	}
 
-	if user.AuthProvider != "local" || user.PasswordHash == nil {
-		return utils.ErrForbidden("password cannot be changed for accounts that use Google sign-in")
-	}
-	if !security.CheckPassword(*user.PasswordHash, req.CurrentPassword) {
+	if !security.CheckPassword(user.PasswordHash, req.CurrentPassword) {
 		return utils.ErrUnauthorized("current password is incorrect")
 	}
 
@@ -116,7 +112,7 @@ func (u *ProfileUsecase) DeleteAccount(ctx context.Context, userID int64) error 
 }
 
 func (u *ProfileUsecase) UpdatePreferences(ctx context.Context, userID int64, req dto.UpdatePreferencesRequest) (dto.PreferencesResponse, error) {
-	if !isValidTimezone(req.Timezone) {
+	if !utils.IsValidTimezone(req.Timezone) {
 		return dto.PreferencesResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
 			{Field: "timezone", Message: "must be a valid IANA timezone"},
 		})
@@ -125,29 +121,4 @@ func (u *ProfileUsecase) UpdatePreferences(ctx context.Context, userID int64, re
 		return dto.PreferencesResponse{}, utils.ErrInternal(err)
 	}
 	return dto.PreferencesResponse{Timezone: req.Timezone}, nil
-}
-
-func passwordStrengthErrors(pw string) []utils.FieldError {
-	var hasLetter, hasDigit bool
-	for _, r := range pw {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
-			hasLetter = true
-		case r >= '0' && r <= '9':
-			hasDigit = true
-		}
-	}
-	var out []utils.FieldError
-	if len([]rune(pw)) < 8 {
-		out = append(out, utils.FieldError{Field: "new_password", Message: "must be at least 8 characters"})
-	}
-	if !hasLetter || !hasDigit {
-		out = append(out, utils.FieldError{Field: "new_password", Message: "must contain both letters and numbers"})
-	}
-	return out
-}
-
-func isValidTimezone(tz string) bool {
-	_, err := time.LoadLocation(tz)
-	return err == nil
 }

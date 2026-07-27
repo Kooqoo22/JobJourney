@@ -5,8 +5,7 @@ import "time"
 type User struct {
 	ID           int64      `db:"id"`
 	Email        string     `db:"email"`
-	PasswordHash *string    `db:"password_hash"`
-	AuthProvider string     `db:"auth_provider"`
+	PasswordHash string     `db:"password_hash"`
 	FullName     string     `db:"full_name"`
 	AvatarURL    *string    `db:"avatar_url"`
 	Timezone     string     `db:"timezone"`
