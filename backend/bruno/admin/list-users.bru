@@ -1,0 +1,49 @@
+meta {
+  name: Admin List Users
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/admin/users
+  auth: bearer
+}
+
+headers {
+  X-Timezone: {{timezone}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:query {
+  q:
+  status:
+  cursor:
+  limit: 20
+}
+
+docs {
+  ## Description
+  Admin-only endpoint. List all user accounts with cursor-based pagination. Supports keyword search across email and full_name, and status filter (active|banned).
+
+  ## Query Parameters
+  - q: keyword search across email and full_name (case-insensitive)
+  - status: active|banned (omit to return all)
+  - cursor: opaque cursor from previous response meta.next_cursor
+  - limit: 1-100 (default: 20)
+
+  ## Responses
+  ### 200 OK
+  { "message": "users retrieved", "data": [ { "id": 1, "email": "user@example.com", "full_name": "Jane Doe", "is_verified": true, "is_banned": false, "role": "user", "created_at": "2026-07-09T10:00:00+07:00" } ], "meta": { "next_cursor": "eyJjYSI6...", "has_next": true, "limit": 20 } }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 403 Forbidden
+  { "message": "insufficient permissions" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}
