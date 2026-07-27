@@ -1,0 +1,50 @@
+meta {
+  name: Admin Unban User
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/admin/users/:id/ban
+  body: none
+  auth: bearer
+}
+
+headers {
+  X-Timezone: {{timezone}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:path {
+  id: 2
+}
+
+docs {
+  ## Description
+  Admin-only endpoint. Lifts the ban on a user account. Cannot unban an admin account.
+
+  ## Responses
+  ### 200 OK
+  { "message": "user unbanned" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 403 Forbidden
+  { "message": "insufficient permissions" }
+
+  ### 403 Forbidden (admin target)
+  { "message": "cannot unban an admin account" }
+
+  ### 404 Not Found
+  { "message": "user not found" }
+
+  ### 409 Conflict
+  { "message": "user is not banned" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}

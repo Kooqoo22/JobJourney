@@ -1,0 +1,63 @@
+meta {
+  name: Admin Ban User
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/admin/users/:id/ban
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  X-Timezone: {{timezone}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:path {
+  id: 2
+}
+
+body:json {
+  {
+    "reason": "Violation of terms of service"
+  }
+}
+
+docs {
+  ## Description
+  Admin-only endpoint. Bans a user account and revokes all their active refresh tokens. Cannot ban yourself or another admin account.
+
+  ## Responses
+  ### 200 OK
+  { "message": "user banned" }
+
+  ### 400 Bad Request
+  { "message": "invalid request body" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 403 Forbidden
+  { "message": "insufficient permissions" }
+
+  ### 403 Forbidden (self-ban)
+  { "message": "cannot ban your own account" }
+
+  ### 403 Forbidden (admin target)
+  { "message": "cannot ban an admin account" }
+
+  ### 404 Not Found
+  { "message": "user not found" }
+
+  ### 409 Conflict
+  { "message": "user is already banned" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}
