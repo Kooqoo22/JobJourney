@@ -144,3 +144,15 @@ func (u *ApplicationUsecase) GetApplication(ctx context.Context, id, userID int6
 	return mapper.ToApplicationResponse(a, userTZ), nil
 }
 
+func (u *ApplicationUsecase) DeleteApplication(ctx context.Context, id, userID int64) error {
+	return u.tx.WithTransaction(ctx, func(txCtx context.Context) error {
+		if err := u.repo.SoftDeleteApplication(txCtx, id, userID); err != nil {
+			return wrapNotFound(err)
+		}
+		if err := u.repo.SoftDeleteApplicationEvents(txCtx, id); err != nil {
+			return utils.ErrInternal(err)
+		}
+		return nil
+	})
+}
+

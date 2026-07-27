@@ -1,0 +1,32 @@
+meta {
+  name: Delete Application
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/applications/1
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## Description
+  Soft-delete a job application owned by the authenticated user. Cascade soft-deletes all related events and documents in a single transaction. Deleted applications can be restored within 30 days via the restore endpoint.
+
+  ## Responses
+  ### 200 OK
+  { "message": "application deleted" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 404 Not Found
+  { "message": "application not found" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}

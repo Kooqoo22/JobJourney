@@ -11,6 +11,8 @@ type ApplicationRepoIface interface {
 	GetByID(ctx context.Context, id, userID int64) (entity.Application, error)
 	List(ctx context.Context, userID int64, f entity.ApplicationListFilter) ([]entity.Application, int64, error)
 	Update(ctx context.Context, a *entity.Application) error
+	SoftDeleteApplication(ctx context.Context, id, userID int64) error
+	SoftDeleteApplicationEvents(ctx context.Context, applicationID int64) error
 }
 
 type TxManagerIface interface {

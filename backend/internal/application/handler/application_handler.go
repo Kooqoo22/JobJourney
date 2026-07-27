@@ -18,6 +18,20 @@ func New(uc ApplicationUsecaseIface) *ApplicationHandler {
 	return &ApplicationHandler{usecase: uc}
 }
 
+func (h *ApplicationHandler) DeleteApplication(c *gin.Context) {
+	var param dto.ApplicationIDParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	userID := c.GetInt64(middleware.ContextUserID)
+	if err := h.usecase.DeleteApplication(c.Request.Context(), param.ID, userID); err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewMessage("application deleted"))
+}
+
 func (h *ApplicationHandler) UpdateApplication(c *gin.Context) {
 	var param dto.ApplicationIDParam
 	if err := c.ShouldBindUri(&param); err != nil {
