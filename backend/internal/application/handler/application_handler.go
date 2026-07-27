@@ -18,6 +18,30 @@ func New(uc ApplicationUsecaseIface) *ApplicationHandler {
 	return &ApplicationHandler{usecase: uc}
 }
 
+func (h *ApplicationHandler) UpdateEvent(c *gin.Context) {
+	var param dto.EventPathParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	var req dto.UpdateEventRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(err)
+		return
+	}
+	userID := c.GetInt64(middleware.ContextUserID)
+	tz := c.GetHeader("X-Timezone")
+	if tz == "" {
+		tz = "Asia/Jakarta"
+	}
+	resp, err := h.usecase.UpdateEvent(c.Request.Context(), param.EventID, param.ID, userID, tz, req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewSuccess("event updated", resp))
+}
+
 func (h *ApplicationHandler) ListEvents(c *gin.Context) {
 	var param dto.ApplicationIDParam
 	if err := c.ShouldBindUri(&param); err != nil {

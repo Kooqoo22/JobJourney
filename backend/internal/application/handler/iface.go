@@ -18,4 +18,5 @@ type ApplicationUsecaseIface interface {
 	ToggleArchive(ctx context.Context, id, userID int64, isArchived bool) error
 	CreateEvent(ctx context.Context, applicationID, userID int64, userTZ string, req dto.CreateEventRequest) (dto.EventResponse, error)
 	ListEvents(ctx context.Context, applicationID, userID int64, userTZ string, q dto.EventListQuery) ([]dto.EventResponse, utils.PageMeta, error)
+	UpdateEvent(ctx context.Context, eventID, applicationID, userID int64, userTZ string, req dto.UpdateEventRequest) (dto.EventResponse, error)
 }

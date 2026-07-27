@@ -59,19 +59,6 @@ func (r *ApplicationRepository) GetByID(ctx context.Context, id, userID int64) (
 	return a, nil
 }
 
-func (r *ApplicationRepository) GetDeletedByID(ctx context.Context, id, userID int64) (entity.Application, error) {
-	exec := database.GetDBTx(ctx, r.db)
-	var a entity.Application
-	query := `SELECT * FROM job_applications WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL`
-	if err := sqlx.GetContext(ctx, exec, &a, query, id, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return entity.Application{}, entity.ErrNotFound
-		}
-		return entity.Application{}, err
-	}
-	return a, nil
-}
-
 func (r *ApplicationRepository) Update(ctx context.Context, a *entity.Application) (err error) {
 	exec := database.GetDBTx(ctx, r.db)
 	query := `
@@ -107,41 +94,6 @@ func (r *ApplicationRepository) Update(ctx context.Context, a *entity.Applicatio
 	return rows.Err()
 }
 
-func (r *ApplicationRepository) UpdateStatus(ctx context.Context, id, userID int64, status string) (entity.Application, error) {
-	exec := database.GetDBTx(ctx, r.db)
-	var a entity.Application
-	query := `
-		UPDATE job_applications
-		SET status = $3, updated_at = NOW()
-		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-		RETURNING *`
-	if err := sqlx.GetContext(ctx, exec, &a, query, id, userID, status); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return entity.Application{}, entity.ErrNotFound
-		}
-		return entity.Application{}, err
-	}
-	return a, nil
-}
-
-func (r *ApplicationRepository) SetArchived(ctx context.Context, id, userID int64, isArchived bool) error {
-	exec := database.GetDBTx(ctx, r.db)
-	res, err := exec.ExecContext(ctx,
-		`UPDATE job_applications SET is_archived = $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
-		id, userID, isArchived)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return entity.ErrNotFound
-	}
-	return nil
-}
-
 func (r *ApplicationRepository) SoftDeleteApplication(ctx context.Context, id, userID int64) error {
 	exec := database.GetDBTx(ctx, r.db)
 	res, err := exec.ExecContext(ctx,
@@ -166,6 +118,54 @@ func (r *ApplicationRepository) SoftDeleteApplicationEvents(ctx context.Context,
 		`UPDATE application_events SET deleted_at = NOW() WHERE application_id = $1 AND deleted_at IS NULL`,
 		applicationID)
 	return err
+}
+
+func (r *ApplicationRepository) SetArchived(ctx context.Context, id, userID int64, isArchived bool) error {
+	exec := database.GetDBTx(ctx, r.db)
+	res, err := exec.ExecContext(ctx,
+		`UPDATE job_applications SET is_archived = $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+		id, userID, isArchived)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return entity.ErrNotFound
+	}
+	return nil
+}
+
+func (r *ApplicationRepository) UpdateStatus(ctx context.Context, id, userID int64, status string) (entity.Application, error) {
+	exec := database.GetDBTx(ctx, r.db)
+	var a entity.Application
+	query := `
+		UPDATE job_applications
+		SET status = $3, updated_at = NOW()
+		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+		RETURNING *`
+	if err := sqlx.GetContext(ctx, exec, &a, query, id, userID, status); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return entity.Application{}, entity.ErrNotFound
+		}
+		return entity.Application{}, err
+	}
+	return a, nil
+}
+
+func (r *ApplicationRepository) GetDeletedByID(ctx context.Context, id, userID int64) (entity.Application, error) {
+	exec := database.GetDBTx(ctx, r.db)
+	var a entity.Application
+	query := `SELECT * FROM job_applications WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL`
+	if err := sqlx.GetContext(ctx, exec, &a, query, id, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return entity.Application{}, entity.ErrNotFound
+		}
+		return entity.Application{}, err
+	}
+	return a, nil
 }
 
 func (r *ApplicationRepository) RestoreApplication(ctx context.Context, id, userID int64) (entity.Application, error) {

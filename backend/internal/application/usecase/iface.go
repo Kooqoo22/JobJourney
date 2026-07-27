@@ -21,6 +21,8 @@ type ApplicationRepoIface interface {
 
 type EventRepoIface interface {
 	InsertEvent(ctx context.Context, e *entity.ApplicationEvent) error
+	GetEventByID(ctx context.Context, eventID, applicationID, userID int64) (entity.ApplicationEvent, error)
+	UpdateEvent(ctx context.Context, e *entity.ApplicationEvent) error
 	ListEvents(ctx context.Context, applicationID int64, offset, limit int) ([]entity.ApplicationEvent, int64, error)
 }
 
