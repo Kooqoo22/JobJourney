@@ -1,0 +1,49 @@
+meta {
+  name: Update Profile
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/profile
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  X-Timezone: {{timezone}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "full_name": "Jane Smith",
+    "avatar_url": null,
+    "timezone": "America/New_York"
+  }
+}
+
+docs {
+  ## Description
+  Updates the authenticated user's profile. Only provided fields are changed; omitted fields retain their current values. Pass null for avatar_url to clear the avatar.
+
+  ## Responses
+  ### 200 OK
+  { "message": "profile updated", "data": { "id": 1, "email": "user@example.com", "full_name": "Jane Smith", "avatar_url": null, "timezone": "America/New_York", "auth_provider": "local", "is_verified": true, "role": "user", "created_at": "2026-07-09T05:00:00-05:00" } }
+
+  ### 400 Bad Request
+  { "message": "invalid request body" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 422 Unprocessable Entity
+  { "message": "validation failed", "errors": [ { "field": "Timezone", "message": "must be a valid IANA timezone" } ] }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}

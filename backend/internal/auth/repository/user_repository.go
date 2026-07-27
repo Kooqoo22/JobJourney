@@ -22,8 +22,8 @@ func NewUserRepository(db *sqlx.DB) *UserRepository {
 func (r *UserRepository) Insert(ctx context.Context, u *entity.User) (err error) {
 	exec := database.GetDBTx(ctx, r.db)
 	query := `
-		INSERT INTO users (email, password_hash, auth_provider, full_name, timezone, is_verified, role)
-		VALUES (:email, :password_hash, :auth_provider, :full_name, :timezone, :is_verified, :role)
+		INSERT INTO users (email, password_hash, full_name, timezone, is_verified, role)
+		VALUES (:email, :password_hash, :full_name, :timezone, :is_verified, :role)
 		RETURNING id, created_at, updated_at`
 	rows, err := sqlx.NamedQueryContext(ctx, exec, query, u)
 	if err != nil {
