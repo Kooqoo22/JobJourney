@@ -9,6 +9,38 @@ import (
 	"github.com/Kooqoo22/JobJourney/backend/pkg/utils"
 )
 
+func (u *ApplicationUsecase) ListApplications(ctx context.Context, userID int64, userTZ string, q dto.ListApplicationsQuery) ([]dto.ApplicationResponse, utils.PageMeta, error) {
+	page := utils.NormalizePage(q.Page)
+	limit := utils.NormalizeLimit(q.Limit)
+	offset := (page - 1) * limit
+
+	f := entity.ApplicationListFilter{
+		Keyword:         q.Q,
+		Status:          q.Status,
+		Source:          q.Source,
+		WorkArrangement: q.WorkArrangement,
+		EmploymentType:  q.EmploymentType,
+		FromDate:        q.FromDate,
+		ToDate:          q.ToDate,
+		IsArchived:      q.IsArchived,
+		SortBy:          q.SortBy,
+		SortDir:         q.SortDir,
+		Offset:          offset,
+		Limit:           limit,
+	}
+
+	apps, total, err := u.repo.List(ctx, userID, f)
+	if err != nil {
+		return nil, utils.PageMeta{}, utils.ErrInternal(err)
+	}
+
+	responses := make([]dto.ApplicationResponse, len(apps))
+	for i, a := range apps {
+		responses[i] = mapper.ToApplicationResponse(a, userTZ)
+	}
+	return responses, utils.NewPageMeta(total, page, limit), nil
+}
+
 type ApplicationUsecase struct {
 	repo ApplicationRepoIface
 	tx   TxManagerIface

@@ -79,6 +79,7 @@ func registerApplicationRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gi
 	h := apphandler.New(uc)
 
 	apps := rg.Group("/applications", authMW)
+	apps.GET("", h.ListApplications)
 	apps.POST("", h.CreateApplication)
 }
 
