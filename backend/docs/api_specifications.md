@@ -465,4 +465,644 @@ Consumes a reset token, sets a new password, and revokes all existing refresh to
 
 ---
 
-> Domain endpoints (applications, events, documents, statistics, admin) are added here as they are implemented, together with their Bruno request files, per the docs-are-part-of-done rule.
+---
+
+## Profile
+
+All profile endpoints require a valid Bearer access token.
+
+---
+
+### GET /api/v1/profile
+Returns the authenticated user's profile.
+
+**200 OK**
+```json
+{ "message": "profile retrieved", "data": { "id": 1, "email": "user@example.com", "full_name": "Jane Doe", "avatar_url": null, "timezone": "Asia/Jakarta", "auth_provider": "local", "is_verified": true, "role": "user", "created_at": "2026-07-09T10:00:00+07:00" } }
+```
+
+**401 Unauthorized** — missing/invalid token
+
+**404 Not Found** — `{ "message": "user not found" }`
+
+**500 Internal Server Error**
+
+---
+
+### PUT /api/v1/profile
+Updates full name, avatar URL, and timezone. All three fields are required.
+
+**Request**
+```json
+{ "full_name": "Jane Doe", "avatar_url": "https://cdn.example.com/avatar.jpg", "timezone": "Asia/Jakarta" }
+```
+
+**200 OK** — returns updated user object (same shape as GET /profile)
+
+**400 Bad Request** — malformed JSON
+
+**401 Unauthorized**
+
+**404 Not Found** — `{ "message": "user not found" }`
+
+**422 Unprocessable Entity** — `{ "message": "validation failed", "errors": [ { "field": "full_name", "message": "required" } ] }`
+
+**500 Internal Server Error**
+
+---
+
+### PATCH /api/v1/profile/password
+Changes the authenticated user's password. Requires current password verification.
+
+**Request**
+```json
+{ "current_password": "oldpass1", "new_password": "newpass99" }
+```
+
+**200 OK**
+```json
+{ "message": "password changed" }
+```
+
+**400 Bad Request** — malformed JSON
+
+**401 Unauthorized** — token invalid, or `{ "message": "current password is incorrect" }`
+
+**422 Unprocessable Entity** — password policy: `{ "message": "password does not meet the requirements", "errors": [...] }`
+
+**500 Internal Server Error**
+
+---
+
+### PATCH /api/v1/profile/preferences
+Updates only the user's timezone preference.
+
+**Request**
+```json
+{ "timezone": "America/New_York" }
+```
+
+**200 OK**
+```json
+{ "message": "preferences updated" }
+```
+
+**400 Bad Request** — malformed JSON
+
+**401 Unauthorized**
+
+**422 Unprocessable Entity** — `{ "message": "validation failed", "errors": [ { "field": "timezone", "message": "must be a valid IANA timezone" } ] }`
+
+**500 Internal Server Error**
+
+---
+
+### DELETE /api/v1/profile
+Cascade soft-deletes the authenticated user's account: application events, documents, job applications, refresh tokens, and the user record are all soft-deleted in a single transaction.
+
+**200 OK**
+```json
+{ "message": "account deleted" }
+```
+
+**401 Unauthorized**
+
+**404 Not Found** — `{ "message": "user not found" }`
+
+**500 Internal Server Error**
+
+---
+
+## Job Applications
+
+All application endpoints require a valid Bearer access token. Resources are scoped to the authenticated user — cross-user access returns `404` (anti-IDOR).
+
+**Application object** (returned in `data`):
+```json
+{
+  "id": 1,
+  "company_name": "Acme Corp",
+  "position_title": "Backend Engineer",
+  "job_url": "https://jobs.acme.com/123",
+  "work_arrangement": "remote",
+  "employment_type": "full_time",
+  "location": "Jakarta",
+  "source": "LinkedIn",
+  "status": "applied",
+  "applied_date": "2026-07-01",
+  "salary_min": "8000000.00",
+  "salary_max": "12000000.00",
+  "currency": "IDR",
+  "notes": "Referred by John",
+  "is_archived": false,
+  "created_at": "2026-07-09T10:00:00+07:00",
+  "updated_at": "2026-07-09T10:00:00+07:00"
+}
+```
+
+Valid `status` values: `wishlist`, `applied`, `screening`, `interview`, `offer`, `accepted`, `rejected`, `withdrawn`, `ghosted`.
+
+Valid `work_arrangement` values: `remote`, `onsite`, `hybrid`.
+
+Valid `employment_type` values: `full_time`, `part_time`, `contract`, `internship`, `freelance`.
+
+---
+
+### POST /api/v1/applications
+Creates a new job application. If `status` is not `wishlist` and `applied_date` is provided, the date must not be in the future. An `application_events` entry of type `applied` is auto-created when `status != wishlist`, inside the same transaction.
+
+**Request**
+```json
+{
+  "company_name": "Acme Corp",
+  "position_title": "Backend Engineer",
+  "job_url": "https://jobs.acme.com/123",
+  "work_arrangement": "remote",
+  "employment_type": "full_time",
+  "location": "Jakarta",
+  "source": "LinkedIn",
+  "status": "applied",
+  "applied_date": "2026-07-01",
+  "salary_min": "8000000.00",
+  "salary_max": "12000000.00",
+  "currency": "IDR",
+  "notes": "Referred by John"
+}
+```
+
+Required: `company_name`, `position_title`. All other fields optional.
+
+**201 Created** — returns the created application object.
+
+**400 Bad Request** — malformed JSON
+
+**401 Unauthorized**
+
+**422 Unprocessable Entity** — `{ "message": "validation failed", "errors": [ { "field": "salary_min", "message": "must be less than or equal to salary_max" } ] }`
+
+**422 Unprocessable Entity** — `{ "message": "applied_date cannot be in the future" }`
+
+**500 Internal Server Error**
+
+---
+
+### GET /api/v1/applications
+Lists the authenticated user's applications with cursor-based pagination and optional filters.
+
+**Query Parameters**
+| Parameter | Type | Description |
+|---|---|---|
+| `q` | string | Keyword search across company_name and position_title (case-insensitive) |
+| `status` | string | Filter by status value |
+| `source` | string | Filter by source |
+| `work_arrangement` | string | Filter by work_arrangement |
+| `employment_type` | string | Filter by employment_type |
+| `from_date` | string | Applied date ≥ (YYYY-MM-DD) |
+| `to_date` | string | Applied date ≤ (YYYY-MM-DD) |
+| `is_archived` | bool | Filter archived (true) or active (false) |
+| `sort_by` | string | `applied_date` (default) or `updated_at` or `created_at` |
+| `sort_dir` | string | `desc` (default) or `asc` |
+| `cursor` | string | Opaque pagination cursor |
+| `limit` | int | Page size 1–100 (default 20) |
+
+**200 OK**
+```json
+{ "message": "applications retrieved", "data": [ { ...application object... } ], "meta": { "next_cursor": "eyJ...", "has_next": true, "limit": 20 } }
+```
+
+**401 Unauthorized**
+
+**500 Internal Server Error**
+
+---
+
+### GET /api/v1/applications/:id
+Returns a single application by ID.
+
+**200 OK** — returns the application object.
+
+**401 Unauthorized**
+
+**404 Not Found** — `{ "message": "application not found" }`
+
+**500 Internal Server Error**
+
+---
+
+### PUT /api/v1/applications/:id
+Updates an application. Uses optimistic concurrency: `updated_at` in the request must match the server-side value.
+
+**Request** — all fields optional; omitted fields are left unchanged.
+```json
+{
+  "company_name": "New Corp",
+  "position_title": "Senior Engineer",
+  "job_url": null,
+  "work_arrangement": "hybrid",
+  "employment_type": "full_time",
+  "location": "Bandung",
+  "source": "Referral",
+  "applied_date": "2026-07-05",
+  "salary_min": "10000000",
+  "salary_max": "15000000",
+  "currency": "IDR",
+  "notes": "Updated notes",
+  "updated_at": "2026-07-09T10:00:00+07:00"
+}
+```
+
+**200 OK** — returns the updated application object.
+
+**400 Bad Request** — malformed JSON
+
+**401 Unauthorized**
+
+**404 Not Found** — `{ "message": "application not found" }`
+
+**409 Conflict** — `{ "message": "application was modified by another request, please refresh and try again" }` (stale `updated_at`)
+
+**422 Unprocessable Entity** — validation errors (salary, date, etc.)
+
+**500 Internal Server Error**
+
+---
+
+### DELETE /api/v1/applications/:id
+Soft-deletes the application along with its events and documents in a single transaction.
+
+**200 OK**
+```json
+{ "message": "application deleted" }
+```
+
+**401 Unauthorized**
+
+**404 Not Found** — `{ "message": "application not found" }`
+
+**500 Internal Server Error**
+
+---
+
+### PATCH /api/v1/applications/:id/restore
+Restores a soft-deleted application if it was deleted within the last 30 days. Only the application record is restored (events and documents remain soft-deleted).
+
+**200 OK** — returns the restored application object.
+
+**401 Unauthorized**
+
+**404 Not Found** — `{ "message": "application not found or not eligible for restore" }`
+
+**409 Conflict** — `{ "message": "application can no longer be restored (deleted more than 30 days ago)" }`
+
+**500 Internal Server Error**
+
+---
+
+### PATCH /api/v1/applications/:id/status
+Changes the application status. No-op if the new status equals the current status. A `status_changed` event is auto-created inside the same transaction when the status actually changes.
+
+**Request**
+```json
+{ "status": "interview" }
+```
+
+**200 OK** — returns the updated application object.
+
+**400 Bad Request** — malformed JSON
+
+**401 Unauthorized**
+
+**404 Not Found** — `{ "message": "application not found" }`
+
+**422 Unprocessable Entity** — invalid status value
+
+**500 Internal Server Error**
+
+---
+
+### PATCH /api/v1/applications/:id/archive
+Toggles the archived flag on an application.
+
+**Request**
+```json
+{ "is_archived": true }
+```
+
+**200 OK**
+```json
+{ "message": "application archived" }
+```
+
+**400 Bad Request** — malformed JSON
+
+**401 Unauthorized**
+
+**404 Not Found** — `{ "message": "application not found" }`
+
+**422 Unprocessable Entity** — `{ "message": "is_archived is required" }`
+
+**500 Internal Server Error**
+
+---
+
+## Application Events
+
+Events track timeline milestones for a job application. All endpoints require Bearer auth. Scoped to the authenticated user.
+
+**Event object**:
+```json
+{
+  "id": 1,
+  "application_id": 1,
+  "type": "interview",
+  "title": "Technical Interview Round 1",
+  "event_at": "2026-07-15T10:00:00+07:00",
+  "notes": "Video call on Google Meet",
+  "remind_at": "2026-07-15T09:00:00+07:00",
+  "status_from": null,
+  "status_to": null,
+  "created_at": "2026-07-09T10:00:00+07:00",
+  "updated_at": "2026-07-09T10:00:00+07:00"
+}
+```
+
+Valid `type` values: `applied`, `phone_screen`, `interview`, `assessment`, `offer`, `follow_up`, `deadline`, `note`, `status_changed`.
+
+---
+
+### POST /api/v1/applications/:id/events
+Creates an event for an application. The application must belong to the authenticated user.
+
+**Request**
+```json
+{
+  "type": "interview",
+  "title": "Technical Interview Round 1",
+  "event_at": "2026-07-15T10:00:00Z",
+  "notes": "Video call on Google Meet",
+  "remind_at": "2026-07-15T09:00:00Z"
+}
+```
+
+Required: `type`, `title`, `event_at`.
+
+**201 Created** — returns the created event object.
+
+**400 Bad Request** — malformed JSON or invalid timestamp
+
+**401 Unauthorized**
+
+**404 Not Found** — `{ "message": "application not found" }` (application doesn't exist or belongs to another user)
+
+**422 Unprocessable Entity** — validation errors
+
+**500 Internal Server Error**
+
+---
+
+### GET /api/v1/applications/:id/events
+Lists events for an application, ordered by `event_at` ascending then `id` ascending.
+
+**Query Parameters**
+| Parameter | Type | Description |
+|---|---|---|
+| `cursor` | string | Opaque pagination cursor |
+| `limit` | int | Page size 1–100 (default 20) |
+
+**200 OK**
+```json
+{ "message": "events retrieved", "data": [ { ...event object... } ], "meta": { "next_cursor": "eyJ...", "has_next": false, "limit": 20 } }
+```
+
+**401 Unauthorized**
+
+**404 Not Found** — `{ "message": "application not found" }`
+
+**500 Internal Server Error**
+
+---
+
+### PUT /api/v1/applications/:id/events/:event_id
+Updates an event. All fields optional; omitted fields are left unchanged.
+
+**Request**
+```json
+{
+  "type": "interview",
+  "title": "Updated Title",
+  "event_at": "2026-07-16T10:00:00Z",
+  "notes": "Rescheduled",
+  "remind_at": null
+}
+```
+
+**200 OK** — returns the updated event object.
+
+**400 Bad Request** — malformed JSON
+
+**401 Unauthorized**
+
+**404 Not Found** — event not found or belongs to another user/application
+
+**422 Unprocessable Entity** — validation errors
+
+**500 Internal Server Error**
+
+---
+
+### DELETE /api/v1/applications/:id/events/:event_id
+Soft-deletes an event.
+
+**200 OK**
+```json
+{ "message": "event deleted" }
+```
+
+**401 Unauthorized**
+
+**404 Not Found** — event not found or belongs to another user/application
+
+**500 Internal Server Error**
+
+---
+
+## Statistics
+
+All stats endpoints require a valid Bearer access token. Data is scoped to the authenticated user and excludes soft-deleted records.
+
+---
+
+### GET /api/v1/stats/summary
+Dashboard summary: total count by status, upcoming events (next 7 days, up to 10), and 5 most recently updated applications. Excludes archived applications from counts.
+
+**200 OK**
+```json
+{
+  "message": "summary retrieved",
+  "data": {
+    "totals": {
+      "all": 42,
+      "by_status": { "applied": 10, "interview": 5, "offer": 2, "accepted": 1 }
+    },
+    "upcoming_events": [
+      { "id": 3, "application_id": 1, "type": "interview", "title": "Technical Interview", "event_at": "2026-07-15T10:00:00+07:00" }
+    ],
+    "recent_applications": [
+      { "id": 1, "company_name": "Acme Corp", "position_title": "Backend Engineer", "status": "interview", "updated_at": "2026-07-09T12:00:00+07:00" }
+    ]
+  }
+}
+```
+
+**401 Unauthorized**
+
+**500 Internal Server Error**
+
+---
+
+### GET /api/v1/stats/applications
+Application analytics for a given period.
+
+**Query Parameters**
+| Parameter | Values | Description |
+|---|---|---|
+| `period` | `week`, `month` (default), `quarter`, `year` | Lookback window and trend granularity |
+
+**Rate Definitions**
+- `response_rate` — (screening + interview + offer + accepted + rejected + withdrawn) / total non-wishlist
+- `interview_rate` — (interview + offer + accepted) / total non-wishlist
+- `offer_rate` — (offer + accepted) / total non-wishlist
+
+**200 OK**
+```json
+{
+  "message": "statistics retrieved",
+  "data": {
+    "funnel": [ { "status": "applied", "count": 10 }, { "status": "interview", "count": 5 } ],
+    "response_rate": 0.65,
+    "interview_rate": 0.30,
+    "offer_rate": 0.05,
+    "trend": [ { "period": "2026-06", "count": 8 }, { "period": "2026-07", "count": 5 } ],
+    "by_source": [ { "source": "LinkedIn", "count": 12 }, { "source": "unknown", "count": 3 } ]
+  }
+}
+```
+
+Trend period format: `YYYY-WNN` (week), `YYYY-MM` (month), `YYYY-QN` (quarter), `YYYY` (year).
+
+**401 Unauthorized**
+
+**422 Unprocessable Entity** — `{ "message": "period must be one of: week, month, quarter, year" }`
+
+**500 Internal Server Error**
+
+---
+
+## Admin
+
+All admin endpoints require a valid Bearer access token and `role = admin`. A non-admin token returns `403`.
+
+---
+
+### GET /api/v1/admin/users
+Lists all user accounts with cursor-based pagination.
+
+**Query Parameters**
+| Parameter | Type | Description |
+|---|---|---|
+| `q` | string | Keyword search across email and full_name (case-insensitive) |
+| `status` | string | `active` or `banned`; omit for all |
+| `cursor` | string | Opaque pagination cursor |
+| `limit` | int | Page size 1–100 (default 20) |
+
+**Admin user object**:
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "full_name": "Jane Doe",
+  "avatar_url": null,
+  "timezone": "Asia/Jakarta",
+  "auth_provider": "local",
+  "is_verified": true,
+  "is_banned": false,
+  "ban_reason": null,
+  "banned_at": null,
+  "last_login_at": "2026-07-09T10:00:00+07:00",
+  "role": "user",
+  "created_at": "2026-07-01T10:00:00+07:00"
+}
+```
+
+**200 OK** — returns list of admin user objects with cursor meta.
+
+**401 Unauthorized**
+
+**403 Forbidden**
+
+**500 Internal Server Error**
+
+---
+
+### DELETE /api/v1/admin/users/:id
+Cascade soft-deletes a user account: application events, documents, job applications, refresh tokens, and the user record in a single transaction. Cannot delete yourself or another admin account.
+
+**200 OK**
+```json
+{ "message": "user deleted" }
+```
+
+**401 Unauthorized**
+
+**403 Forbidden** — insufficient role, or `{ "message": "cannot delete your own account" }`, or `{ "message": "cannot delete an admin account" }`
+
+**404 Not Found** — `{ "message": "user not found" }`
+
+**500 Internal Server Error**
+
+---
+
+### POST /api/v1/admin/users/:id/ban
+Bans a user account and revokes all their active refresh tokens in a single transaction. Cannot ban yourself or another admin.
+
+**Request** (body optional)
+```json
+{ "reason": "Violation of terms of service" }
+```
+
+**200 OK**
+```json
+{ "message": "user banned" }
+```
+
+**400 Bad Request** — malformed JSON
+
+**401 Unauthorized**
+
+**403 Forbidden** — insufficient role, or `{ "message": "cannot ban your own account" }`, or `{ "message": "cannot ban an admin account" }`
+
+**404 Not Found** — `{ "message": "user not found" }`
+
+**409 Conflict** — `{ "message": "user is already banned" }`
+
+**500 Internal Server Error**
+
+---
+
+### DELETE /api/v1/admin/users/:id/ban
+Lifts the ban on a user account. Cannot unban an admin account.
+
+**200 OK**
+```json
+{ "message": "user unbanned" }
+```
+
+**401 Unauthorized**
+
+**403 Forbidden** — insufficient role, or `{ "message": "cannot unban an admin account" }`
+
+**404 Not Found** — `{ "message": "user not found" }`
+
+**409 Conflict** — `{ "message": "user is not banned" }`
+
+**500 Internal Server Error**
