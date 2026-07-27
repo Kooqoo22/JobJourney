@@ -2,12 +2,37 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/Kooqoo22/JobJourney/backend/internal/application/dto"
 	"github.com/Kooqoo22/JobJourney/backend/internal/application/entity"
 	"github.com/Kooqoo22/JobJourney/backend/internal/application/mapper"
 	"github.com/Kooqoo22/JobJourney/backend/pkg/utils"
 )
+
+func (u *ApplicationUsecase) UpdateApplication(ctx context.Context, id, userID int64, userTZ string, req dto.UpdateApplicationRequest) (dto.ApplicationResponse, error) {
+	current, err := u.repo.GetByID(ctx, id, userID)
+	if err != nil {
+		return dto.ApplicationResponse{}, wrapNotFound(err)
+	}
+
+	if req.UpdatedAt != nil {
+		clientTime, parseErr := time.Parse(time.RFC3339, *req.UpdatedAt)
+		if parseErr != nil || !current.UpdatedAt.UTC().Equal(clientTime.UTC()) {
+			return dto.ApplicationResponse{}, utils.ErrConflict("application was modified by another request, please refresh and retry")
+		}
+	}
+
+	updated, err := applyApplicationUpdates(current, req)
+	if err != nil {
+		return dto.ApplicationResponse{}, err
+	}
+
+	if err := u.repo.Update(ctx, &updated); err != nil {
+		return dto.ApplicationResponse{}, utils.ErrInternal(err)
+	}
+	return mapper.ToApplicationResponse(updated, userTZ), nil
+}
 
 func (u *ApplicationUsecase) ListApplications(ctx context.Context, userID int64, userTZ string, q dto.ListApplicationsQuery) ([]dto.ApplicationResponse, utils.PageMeta, error) {
 	page := utils.NormalizePage(q.Page)
@@ -108,6 +133,14 @@ func (u *ApplicationUsecase) CreateApplication(ctx context.Context, userID int64
 		return dto.ApplicationResponse{}, utils.ErrInternal(err)
 	}
 
+	return mapper.ToApplicationResponse(a, userTZ), nil
+}
+
+func (u *ApplicationUsecase) GetApplication(ctx context.Context, id, userID int64, userTZ string) (dto.ApplicationResponse, error) {
+	a, err := u.repo.GetByID(ctx, id, userID)
+	if err != nil {
+		return dto.ApplicationResponse{}, wrapNotFound(err)
+	}
 	return mapper.ToApplicationResponse(a, userTZ), nil
 }
 
