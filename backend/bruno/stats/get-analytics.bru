@@ -1,0 +1,41 @@
+meta {
+  name: Get Application Analytics
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/stats/applications
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:query {
+  period: month
+}
+
+docs {
+  ## Description
+  Application analytics: funnel counts by status, response/interview/offer conversion rates, trend over time, and breakdown by source.
+
+  ## Query Parameters
+  - period: week|month|quarter|year (default: month) — determines trend granularity and lookback window
+
+  ## Rate definitions
+  - response_rate: applications that moved to screening/interview/offer/accepted/rejected/withdrawn / total non-wishlist applications
+  - interview_rate: applications that reached interview/offer/accepted / total non-wishlist applications
+  - offer_rate: applications that reached offer/accepted / total non-wishlist applications
+
+  ## Responses
+  ### 200 OK
+  { "message": "statistics retrieved", "data": { "funnel": [ { "status": "applied", "count": 10 }, { "status": "interview", "count": 5 } ], "response_rate": 0.65, "interview_rate": 0.30, "offer_rate": 0.05, "trend": [ { "period": "2026-06", "count": 8 }, { "period": "2026-07", "count": 5 } ], "by_source": [ { "source": "LinkedIn", "count": 12 }, { "source": "unknown", "count": 3 } ] } }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}
