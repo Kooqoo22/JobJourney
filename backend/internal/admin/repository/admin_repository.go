@@ -62,6 +62,27 @@ func (r *AdminRepository) ListUsers(ctx context.Context, q, status string, offse
 	return users, total, nil
 }
 
+func (r *AdminRepository) BanUser(ctx context.Context, id int64, reason *string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE users SET is_banned = true, banned_at = NOW(), ban_reason = $2, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+		id, reason)
+	return err
+}
+
+func (r *AdminRepository) UnbanUser(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE users SET is_banned = false, banned_at = NULL, ban_reason = NULL, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+		id)
+	return err
+}
+
+func (r *AdminRepository) RevokeAllTokensByUserID(ctx context.Context, userID int64) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
+		userID)
+	return err
+}
+
 func (r *AdminRepository) GetUserByID(ctx context.Context, id int64) (authEntity.User, error) {
 	var u authEntity.User
 	if err := r.db.GetContext(ctx, &u, `SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL`, id); err != nil {

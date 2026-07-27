@@ -6,3 +6,11 @@ type ListUsersQuery struct {
 	Page   int    `form:"page"`
 	Limit  int    `form:"limit"`
 }
+
+type UserIDParam struct {
+	ID int64 `uri:"id" binding:"required,gt=0"`
+}
+
+type BanUserRequest struct {
+	Reason *string `json:"reason" binding:"omitempty,max=500"`
+}

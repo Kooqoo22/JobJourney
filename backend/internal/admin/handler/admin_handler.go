@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	adminDto "github.com/Kooqoo22/JobJourney/backend/internal/admin/dto"
+	"github.com/Kooqoo22/JobJourney/backend/internal/middleware"
 	"github.com/Kooqoo22/JobJourney/backend/pkg/utils"
 )
 
@@ -33,4 +34,37 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, utils.NewList("users retrieved", users, meta))
+}
+
+func (h *AdminHandler) BanUser(c *gin.Context) {
+	var param adminDto.UserIDParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	var req adminDto.BanUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(err)
+		return
+	}
+	adminID := c.GetInt64(middleware.ContextUserID)
+	if err := h.usecase.BanUser(c.Request.Context(), adminID, param.ID, req.Reason); err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewMessage("user banned"))
+}
+
+func (h *AdminHandler) UnbanUser(c *gin.Context) {
+	var param adminDto.UserIDParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	adminID := c.GetInt64(middleware.ContextUserID)
+	if err := h.usecase.UnbanUser(c.Request.Context(), adminID, param.ID); err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewMessage("user unbanned"))
 }

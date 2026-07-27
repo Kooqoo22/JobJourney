@@ -68,11 +68,14 @@ func registerRoutes(rg *gin.RouterGroup, deps Dependencies) {
 
 func registerAdminRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.HandlerFunc) {
 	repo := adminrepo.New(deps.DB)
-	uc := adminusecase.New(repo)
+	tx := database.NewTxManager(deps.DB)
+	uc := adminusecase.New(repo, tx)
 	h := adminhandler.New(uc)
 
 	adminGroup := rg.Group("/admin", authMW, middleware.RequireRole("admin"))
 	adminGroup.GET("/users", h.ListUsers)
+	adminGroup.POST("/users/:id/ban", h.BanUser)
+	adminGroup.DELETE("/users/:id/ban", h.UnbanUser)
 }
 
 func registerStatsRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gin.HandlerFunc) {
