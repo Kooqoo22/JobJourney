@@ -43,7 +43,6 @@ func (r *ProfileRepository) SoftDeleteUserData(ctx context.Context, userID int64
 	exec := database.GetDBTx(ctx, r.db)
 	queries := []string{
 		`UPDATE application_events SET deleted_at = NOW(), updated_at = NOW() WHERE user_id = $1 AND deleted_at IS NULL`,
-		`UPDATE application_documents SET deleted_at = NOW() WHERE user_id = $1 AND deleted_at IS NULL`,
 		`UPDATE job_applications SET deleted_at = NOW(), updated_at = NOW() WHERE user_id = $1 AND deleted_at IS NULL`,
 		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
 	}
