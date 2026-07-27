@@ -63,6 +63,105 @@ func (r *ApplicationRepository) GetByID(ctx context.Context, id, userID int64) (
 
 var ErrNotFound = errors.New("application not found")
 
+func (r *ApplicationRepository) Update(ctx context.Context, a *entity.Application) (err error) {
+	exec := database.GetDBTx(ctx, r.db)
+	query := `
+		UPDATE job_applications
+		SET company_name = :company_name,
+		    position_title = :position_title,
+		    job_url = :job_url,
+		    work_arrangement = :work_arrangement,
+		    employment_type = :employment_type,
+		    location = :location,
+		    source = :source,
+		    status = :status,
+		    applied_date = :applied_date,
+		    salary_min = :salary_min,
+		    salary_max = :salary_max,
+		    currency = :currency,
+		    notes = :notes,
+		    updated_at = NOW()
+		WHERE id = :id AND user_id = :user_id AND deleted_at IS NULL
+		RETURNING updated_at`
+	rows, err := sqlx.NamedQueryContext(ctx, exec, query, a)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := rows.Close(); err == nil {
+			err = cerr
+		}
+	}()
+	if rows.Next() {
+		return rows.StructScan(a)
+	}
+	return rows.Err()
+}
+
+func (r *ApplicationRepository) GetDeletedByID(ctx context.Context, id, userID int64) (entity.Application, error) {
+	exec := database.GetDBTx(ctx, r.db)
+	var a entity.Application
+	query := `SELECT * FROM job_applications WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL`
+	if err := sqlx.GetContext(ctx, exec, &a, query, id, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return entity.Application{}, ErrNotFound
+		}
+		return entity.Application{}, err
+	}
+	return a, nil
+}
+
+func (r *ApplicationRepository) RestoreApplication(ctx context.Context, id, userID int64) (entity.Application, error) {
+	exec := database.GetDBTx(ctx, r.db)
+	var a entity.Application
+	query := `
+		UPDATE job_applications
+		SET deleted_at = NULL, updated_at = NOW()
+		WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL
+		RETURNING *`
+	if err := sqlx.GetContext(ctx, exec, &a, query, id, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return entity.Application{}, ErrNotFound
+		}
+		return entity.Application{}, err
+	}
+	return a, nil
+}
+
+func (r *ApplicationRepository) SoftDeleteApplication(ctx context.Context, id, userID int64) error {
+	exec := database.GetDBTx(ctx, r.db)
+	res, err := exec.ExecContext(ctx,
+		`UPDATE job_applications SET deleted_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+		id, userID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *ApplicationRepository) SoftDeleteApplicationEvents(ctx context.Context, applicationID int64) error {
+	exec := database.GetDBTx(ctx, r.db)
+	_, err := exec.ExecContext(ctx,
+		`UPDATE application_events SET deleted_at = NOW() WHERE application_id = $1 AND deleted_at IS NULL`,
+		applicationID)
+	return err
+}
+
+func (r *ApplicationRepository) SoftDeleteApplicationDocuments(ctx context.Context, applicationID int64) error {
+	exec := database.GetDBTx(ctx, r.db)
+	_, err := exec.ExecContext(ctx,
+		`UPDATE application_documents SET deleted_at = NOW() WHERE application_id = $1 AND deleted_at IS NULL`,
+		applicationID)
+	return err
+}
+
 var validSortBy = map[string]bool{
 	"updated_at": true, "applied_date": true, "company_name": true, "status": true,
 }
