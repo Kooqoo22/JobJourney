@@ -18,6 +18,92 @@ func New(uc ApplicationUsecaseIface) *ApplicationHandler {
 	return &ApplicationHandler{usecase: uc}
 }
 
+func (h *ApplicationHandler) DeleteEvent(c *gin.Context) {
+	var param dto.EventPathParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	userID := c.GetInt64(middleware.ContextUserID)
+	if err := h.usecase.DeleteEvent(c.Request.Context(), param.EventID, param.ID, userID); err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewMessage("event deleted"))
+}
+
+func (h *ApplicationHandler) UpdateEvent(c *gin.Context) {
+	var param dto.EventPathParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	var req dto.UpdateEventRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(err)
+		return
+	}
+	userID := c.GetInt64(middleware.ContextUserID)
+	tz := c.GetHeader("X-Timezone")
+	if tz == "" {
+		tz = "Asia/Jakarta"
+	}
+	resp, err := h.usecase.UpdateEvent(c.Request.Context(), param.EventID, param.ID, userID, tz, req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewSuccess("event updated", resp))
+}
+
+func (h *ApplicationHandler) ListEvents(c *gin.Context) {
+	var param dto.ApplicationIDParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	var q dto.EventListQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		c.Error(err)
+		return
+	}
+	userID := c.GetInt64(middleware.ContextUserID)
+	tz := c.GetHeader("X-Timezone")
+	if tz == "" {
+		tz = "Asia/Jakarta"
+	}
+	events, meta, err := h.usecase.ListEvents(c.Request.Context(), param.ID, userID, tz, q)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewList("events retrieved", events, meta))
+}
+
+func (h *ApplicationHandler) CreateEvent(c *gin.Context) {
+	var param dto.ApplicationIDParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.Error(err)
+		return
+	}
+	var req dto.CreateEventRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(err)
+		return
+	}
+	userID := c.GetInt64(middleware.ContextUserID)
+	tz := c.GetHeader("X-Timezone")
+	if tz == "" {
+		tz = "Asia/Jakarta"
+	}
+	resp, err := h.usecase.CreateEvent(c.Request.Context(), param.ID, userID, tz, req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusCreated, utils.NewSuccess("event created", resp))
+}
+
 func (h *ApplicationHandler) ToggleArchive(c *gin.Context) {
 	var param dto.ApplicationIDParam
 	if err := c.ShouldBindUri(&param); err != nil {

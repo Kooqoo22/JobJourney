@@ -1,0 +1,32 @@
+meta {
+  name: Delete Event
+  type: http
+  seq: 12
+}
+
+delete {
+  url: {{baseUrl}}/applications/1/events/1
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## Description
+  Soft-delete an application event. Returns 404 if the event does not belong to the specified application or authenticated user.
+
+  ## Responses
+  ### 200 OK
+  { "message": "event deleted" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 404 Not Found
+  { "message": "event not found" }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}
