@@ -1,7 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "citext";
 
-CREATE TYPE auth_provider AS ENUM ('local', 'google');
 CREATE TYPE user_role AS ENUM ('user', 'admin');
 
 CREATE TYPE application_status AS ENUM (
@@ -20,8 +19,7 @@ CREATE TYPE email_token_type AS ENUM ('verify', 'reset');
 CREATE TABLE users (
     id            BIGSERIAL PRIMARY KEY,
     email         CITEXT NOT NULL,
-    password_hash TEXT,
-    auth_provider auth_provider NOT NULL DEFAULT 'local',
+    password_hash TEXT NOT NULL,
     full_name     TEXT NOT NULL,
     avatar_url    TEXT,
     timezone      TEXT NOT NULL DEFAULT 'Asia/Jakarta',
@@ -83,20 +81,6 @@ CREATE TABLE application_events (
 
 CREATE INDEX application_events_app_event_idx ON application_events (application_id, event_at, id);
 CREATE INDEX application_events_remind_idx ON application_events (remind_at) WHERE reminded_at IS NULL AND deleted_at IS NULL;
-
-CREATE TABLE application_documents (
-    id             BIGSERIAL PRIMARY KEY,
-    application_id BIGINT NOT NULL REFERENCES job_applications (id),
-    user_id        BIGINT NOT NULL REFERENCES users (id),
-    file_url       TEXT NOT NULL,
-    file_name      TEXT NOT NULL,
-    mime_type      TEXT NOT NULL,
-    size_bytes     BIGINT NOT NULL,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    deleted_at     TIMESTAMPTZ
-);
-
-CREATE INDEX application_documents_app_idx ON application_documents (application_id) WHERE deleted_at IS NULL;
 
 CREATE TABLE email_tokens (
     id         BIGSERIAL PRIMARY KEY,
