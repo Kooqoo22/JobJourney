@@ -1,0 +1,57 @@
+meta {
+  name: Create Event
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/applications/1/events
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  X-Timezone: {{timezone}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "type": "interview",
+    "title": "Technical Interview Round 2",
+    "event_at": "2026-07-15T10:00:00+07:00",
+    "notes": "Prepare system design",
+    "remind_at": "2026-07-14T10:00:00+07:00"
+  }
+}
+
+docs {
+  ## Description
+  Add an event to an application's timeline. Returns 404 if the application does not belong to the authenticated user. remind_at must be in the future if provided.
+
+  ## Event types
+  applied | phone_screen | interview | assessment | offer | follow_up | deadline | note | status_changed
+
+  ## Responses
+  ### 201 Created
+  { "message": "event created", "data": { "id": 1, "application_id": 1, "type": "interview", "title": "Technical Interview Round 2", "event_at": "2026-07-15T10:00:00+07:00", "notes": "Prepare system design", "remind_at": "2026-07-14T10:00:00+07:00", "status_from": null, "status_to": null, "created_at": "2026-07-09T12:00:00+07:00", "updated_at": "2026-07-09T12:00:00+07:00" } }
+
+  ### 400 Bad Request
+  { "message": "invalid request body" }
+
+  ### 401 Unauthorized
+  { "message": "missing authorization token" }
+
+  ### 404 Not Found
+  { "message": "application not found" }
+
+  ### 422 Unprocessable Entity
+  { "message": "validation failed", "errors": [ { "field": "remind_at", "message": "must be in the future" } ] }
+
+  ### 500 Internal Server Error
+  { "message": "internal server error" }
+}
