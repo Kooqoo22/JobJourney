@@ -11,4 +11,5 @@ type ProfileUsecaseIface interface {
 	UpdateProfile(ctx context.Context, userID int64, req dto.UpdateProfileRequest) (dto.ProfileResponse, error)
 	ChangePassword(ctx context.Context, userID int64, req dto.ChangePasswordRequest) error
 	UpdatePreferences(ctx context.Context, userID int64, req dto.UpdatePreferencesRequest) (dto.PreferencesResponse, error)
+	DeleteAccount(ctx context.Context, userID int64) error
 }

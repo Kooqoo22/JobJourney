@@ -28,6 +28,15 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, utils.NewSuccess("profile retrieved", resp))
 }
 
+func (h *ProfileHandler) DeleteAccount(c *gin.Context) {
+	userID := c.GetInt64(middleware.ContextUserID)
+	if err := h.usecase.DeleteAccount(c.Request.Context(), userID); err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, utils.NewMessage("account deleted"))
+}
+
 func (h *ProfileHandler) UpdatePreferences(c *gin.Context) {
 	var req dto.UpdatePreferencesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
