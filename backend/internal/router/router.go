@@ -87,8 +87,6 @@ func registerApplicationRoutes(rg *gin.RouterGroup, deps Dependencies, authMW gi
 	apps.DELETE("/:id", h.DeleteApplication)
 	apps.PATCH("/:id/restore", h.RestoreApplication)
 	apps.PATCH("/:id/status", h.ChangeStatus)
-	apps.PATCH("/:id/archive", h.ToggleArchive)
-	apps.POST("/:id/events", h.CreateEvent)
 }
 
 func registerAuthRoutes(rg *gin.RouterGroup, deps Dependencies) {

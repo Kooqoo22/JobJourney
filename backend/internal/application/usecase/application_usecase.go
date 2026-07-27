@@ -2,11 +2,14 @@ package usecase
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/Kooqoo22/JobJourney/backend/internal/application/dto"
 	"github.com/Kooqoo22/JobJourney/backend/internal/application/entity"
 	"github.com/Kooqoo22/JobJourney/backend/internal/application/mapper"
+	appRepo "github.com/Kooqoo22/JobJourney/backend/internal/application/repository"
 	"github.com/Kooqoo22/JobJourney/backend/pkg/utils"
 )
 
@@ -30,20 +33,20 @@ func (u *ApplicationUsecase) CreateApplication(ctx context.Context, userID int64
 		status = "applied"
 	}
 
-	appliedDate, err := mapper.ParseAppliedDate(req.AppliedDate)
+	appliedDate, err := appRepo.ParseAppliedDate(req.AppliedDate)
 	if err != nil {
 		return dto.ApplicationResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
 			{Field: "applied_date", Message: "must be a valid date in YYYY-MM-DD format"},
 		})
 	}
 
-	salaryMin, err := mapper.ParseSalary(req.SalaryMin)
+	salaryMin, err := appRepo.ParseSalary(req.SalaryMin)
 	if err != nil {
 		return dto.ApplicationResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
 			{Field: "salary_min", Message: "must be a valid decimal number"},
 		})
 	}
-	salaryMax, err := mapper.ParseSalary(req.SalaryMax)
+	salaryMax, err := appRepo.ParseSalary(req.SalaryMax)
 	if err != nil {
 		return dto.ApplicationResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
 			{Field: "salary_max", Message: "must be a valid decimal number"},
@@ -81,18 +84,13 @@ func (u *ApplicationUsecase) CreateApplication(ctx context.Context, userID int64
 	return mapper.ToApplicationResponse(a, userTZ), nil
 }
 
-func (u *ApplicationUsecase) GetApplication(ctx context.Context, id, userID int64, userTZ string) (dto.ApplicationResponse, error) {
-	a, err := u.repo.GetByID(ctx, id, userID)
-	if err != nil {
-		return dto.ApplicationResponse{}, wrapNotFound(err)
-	}
-	return mapper.ToApplicationResponse(a, userTZ), nil
+type appListCursor struct {
+	SortVal string `json:"sv"`
+	ID      int64  `json:"id"`
 }
 
-func (u *ApplicationUsecase) ListApplications(ctx context.Context, userID int64, userTZ string, q dto.ListApplicationsQuery) ([]dto.ApplicationResponse, utils.PageMeta, error) {
-	page := utils.NormalizePage(q.Page)
+func (u *ApplicationUsecase) ListApplications(ctx context.Context, userID int64, userTZ string, q dto.ListApplicationsQuery) ([]dto.ApplicationResponse, utils.CursorMeta, error) {
 	limit := utils.NormalizeLimit(q.Limit)
-	offset := (page - 1) * limit
 
 	f := entity.ApplicationListFilter{
 		Keyword:         q.Q,
@@ -105,20 +103,146 @@ func (u *ApplicationUsecase) ListApplications(ctx context.Context, userID int64,
 		IsArchived:      q.IsArchived,
 		SortBy:          q.SortBy,
 		SortDir:         q.SortDir,
-		Offset:          offset,
-		Limit:           limit,
+		Limit:           limit + 1,
 	}
 
-	apps, total, err := u.repo.List(ctx, userID, f)
+	if q.Cursor != "" {
+		var c appListCursor
+		if err := utils.DecodeCursor(q.Cursor, &c); err != nil {
+			return nil, utils.CursorMeta{}, utils.ErrUnprocessable("invalid cursor", nil)
+		}
+		f.CursorSortVal = &c.SortVal
+		f.CursorID = &c.ID
+	}
+
+	apps, err := u.repo.List(ctx, userID, f)
 	if err != nil {
-		return nil, utils.PageMeta{}, utils.ErrInternal(err)
+		return nil, utils.CursorMeta{}, utils.ErrInternal(err)
+	}
+
+	hasNext := len(apps) > limit
+	if hasNext {
+		apps = apps[:limit]
+	}
+
+	meta := utils.CursorMeta{HasNext: hasNext, Limit: limit}
+
+	if hasNext && len(apps) > 0 {
+		last := apps[len(apps)-1]
+		sv := listSortVal(last, q.SortBy, q.SortDir)
+		cursor, err := utils.EncodeCursor(appListCursor{SortVal: sv, ID: last.ID})
+		if err != nil {
+			return nil, utils.CursorMeta{}, utils.ErrInternal(err)
+		}
+		meta.NextCursor = cursor
 	}
 
 	responses := make([]dto.ApplicationResponse, len(apps))
 	for i, a := range apps {
 		responses[i] = mapper.ToApplicationResponse(a, userTZ)
 	}
-	return responses, utils.NewPageMeta(total, page, limit), nil
+	return responses, meta, nil
+}
+
+func listSortVal(a entity.Application, sortBy, sortDir string) string {
+	dir := strings.ToUpper(sortDir)
+	if dir != "ASC" && dir != "DESC" {
+		dir = "DESC"
+	}
+	switch sortBy {
+	case "applied_date":
+		sentinel := "1970-01-01"
+		if dir == "ASC" {
+			sentinel = "9999-12-31"
+		}
+		if a.AppliedDate == nil {
+			return sentinel
+		}
+		return a.AppliedDate.Format("2006-01-02")
+	case "company_name":
+		return a.CompanyName
+	case "status":
+		return a.Status
+	default:
+		return a.UpdatedAt.UTC().Format(time.RFC3339Nano)
+	}
+}
+
+func (u *ApplicationUsecase) ChangeStatus(ctx context.Context, id, userID int64, userTZ string, req dto.ChangeStatusRequest) (dto.ApplicationResponse, error) {
+	current, err := u.repo.GetByID(ctx, id, userID)
+	if err != nil {
+		return dto.ApplicationResponse{}, wrapNotFound(err)
+	}
+
+	if current.Status == req.Status {
+		return mapper.ToApplicationResponse(current, userTZ), nil
+	}
+
+	oldStatus := current.Status
+	var updated entity.Application
+
+	err = u.tx.WithTransaction(ctx, func(txCtx context.Context) error {
+		a, txErr := u.repo.UpdateStatus(txCtx, id, userID, req.Status)
+		if txErr != nil {
+			return txErr
+		}
+		updated = a
+
+		title := "Status changed to " + req.Status
+		event := entity.ApplicationEvent{
+			ApplicationID: id,
+			UserID:        userID,
+			Type:          "status_changed",
+			Title:         title,
+			EventAt:       a.UpdatedAt,
+			StatusFrom:    &oldStatus,
+			StatusTo:      &req.Status,
+		}
+		return u.eventRepo.InsertEvent(txCtx, &event)
+	})
+	if err != nil {
+		if errors.Is(err, appRepo.ErrNotFound) {
+			return dto.ApplicationResponse{}, utils.ErrNotFound("application not found")
+		}
+		return dto.ApplicationResponse{}, utils.ErrInternal(err)
+	}
+
+	return mapper.ToApplicationResponse(updated, userTZ), nil
+}
+
+func (u *ApplicationUsecase) RestoreApplication(ctx context.Context, id, userID int64, userTZ string) (dto.ApplicationResponse, error) {
+	a, err := u.repo.GetDeletedByID(ctx, id, userID)
+	if err != nil {
+		return dto.ApplicationResponse{}, utils.ErrNotFound("application not found")
+	}
+
+	if a.DeletedAt != nil && time.Since(*a.DeletedAt) > 30*24*time.Hour {
+		return dto.ApplicationResponse{}, utils.ErrConflict("application cannot be restored after the retention period")
+	}
+
+	restored, err := u.repo.RestoreApplication(ctx, id, userID)
+	if err != nil {
+		return dto.ApplicationResponse{}, utils.ErrInternal(err)
+	}
+	return mapper.ToApplicationResponse(restored, userTZ), nil
+}
+
+func (u *ApplicationUsecase) DeleteApplication(ctx context.Context, id, userID int64) error {
+	return u.tx.WithTransaction(ctx, func(txCtx context.Context) error {
+		if err := u.repo.SoftDeleteApplication(txCtx, id, userID); err != nil {
+			if errors.Is(err, appRepo.ErrNotFound) {
+				return utils.ErrNotFound("application not found")
+			}
+			return utils.ErrInternal(err)
+		}
+		if err := u.repo.SoftDeleteApplicationEvents(txCtx, id); err != nil {
+			return utils.ErrInternal(err)
+		}
+		if err := u.repo.SoftDeleteApplicationDocuments(txCtx, id); err != nil {
+			return utils.ErrInternal(err)
+		}
+		return nil
+	})
 }
 
 func (u *ApplicationUsecase) UpdateApplication(ctx context.Context, id, userID int64, userTZ string, req dto.UpdateApplicationRequest) (dto.ApplicationResponse, error) {
@@ -145,85 +269,147 @@ func (u *ApplicationUsecase) UpdateApplication(ctx context.Context, id, userID i
 	return mapper.ToApplicationResponse(updated, userTZ), nil
 }
 
-func (u *ApplicationUsecase) DeleteApplication(ctx context.Context, id, userID int64) error {
-	return u.tx.WithTransaction(ctx, func(txCtx context.Context) error {
-		if err := u.repo.SoftDeleteApplication(txCtx, id, userID); err != nil {
-			return wrapNotFound(err)
+func applyApplicationUpdates(cur entity.Application, req dto.UpdateApplicationRequest) (entity.Application, error) {
+	if req.CompanyName != nil {
+		cur.CompanyName = *req.CompanyName
+	}
+	if req.PositionTitle != nil {
+		cur.PositionTitle = *req.PositionTitle
+	}
+	if req.JobURL != nil {
+		if *req.JobURL == "" {
+			cur.JobURL = nil
+		} else {
+			cur.JobURL = req.JobURL
 		}
-		if err := u.repo.SoftDeleteApplicationEvents(txCtx, id); err != nil {
-			return utils.ErrInternal(err)
+	}
+	if req.WorkArrangement != nil {
+		if *req.WorkArrangement == "" {
+			cur.WorkArrangement = nil
+		} else {
+			cur.WorkArrangement = req.WorkArrangement
 		}
-		return nil
-	})
+	}
+	if req.EmploymentType != nil {
+		if *req.EmploymentType == "" {
+			cur.EmploymentType = nil
+		} else {
+			cur.EmploymentType = req.EmploymentType
+		}
+	}
+	if req.Location != nil {
+		if *req.Location == "" {
+			cur.Location = nil
+		} else {
+			cur.Location = req.Location
+		}
+	}
+	if req.Source != nil {
+		if *req.Source == "" {
+			cur.Source = nil
+		} else {
+			cur.Source = req.Source
+		}
+	}
+	if req.Status != nil {
+		cur.Status = *req.Status
+	}
+	if req.AppliedDate != nil {
+		if *req.AppliedDate == "" {
+			cur.AppliedDate = nil
+		} else {
+			t, err := appRepo.ParseAppliedDate(req.AppliedDate)
+			if err != nil {
+				return entity.Application{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
+					{Field: "applied_date", Message: "must be a valid date in YYYY-MM-DD format"},
+				})
+			}
+			cur.AppliedDate = t
+		}
+	}
+	if req.SalaryMin != nil {
+		if *req.SalaryMin == "" {
+			cur.SalaryMin = nil
+		} else {
+			d, err := appRepo.ParseSalary(req.SalaryMin)
+			if err != nil {
+				return entity.Application{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
+					{Field: "salary_min", Message: "must be a valid decimal number"},
+				})
+			}
+			cur.SalaryMin = d
+		}
+	}
+	if req.SalaryMax != nil {
+		if *req.SalaryMax == "" {
+			cur.SalaryMax = nil
+		} else {
+			d, err := appRepo.ParseSalary(req.SalaryMax)
+			if err != nil {
+				return entity.Application{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
+					{Field: "salary_max", Message: "must be a valid decimal number"},
+				})
+			}
+			cur.SalaryMax = d
+		}
+	}
+	if req.Currency != nil {
+		if *req.Currency == "" {
+			cur.Currency = nil
+		} else {
+			cur.Currency = req.Currency
+		}
+	}
+	if req.Notes != nil {
+		if *req.Notes == "" {
+			cur.Notes = nil
+		} else {
+			cur.Notes = req.Notes
+		}
+	}
+
+	if cur.SalaryMin != nil && cur.SalaryMax != nil && cur.SalaryMin.GreaterThan(*cur.SalaryMax) {
+		return entity.Application{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
+			{Field: "salary_min", Message: "must be less than or equal to salary_max"},
+		})
+	}
+	if cur.AppliedDate != nil && cur.Status != "wishlist" && cur.AppliedDate.After(time.Now().UTC()) {
+		return entity.Application{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
+			{Field: "applied_date", Message: "cannot be in the future"},
+		})
+	}
+
+	return cur, nil
 }
 
-func (u *ApplicationUsecase) RestoreApplication(ctx context.Context, id, userID int64, userTZ string) (dto.ApplicationResponse, error) {
-	if _, err := u.repo.GetDeletedByID(ctx, id, userID); err != nil {
-		return dto.ApplicationResponse{}, utils.ErrNotFound("application not found")
-	}
-	a, err := u.repo.RestoreApplication(ctx, id, userID)
-	if err != nil {
-		return dto.ApplicationResponse{}, utils.ErrInternal(err)
-	}
-	return mapper.ToApplicationResponse(a, userTZ), nil
-}
-
-func (u *ApplicationUsecase) ChangeStatus(ctx context.Context, id, userID int64, userTZ string, req dto.ChangeStatusRequest) (dto.ApplicationResponse, error) {
-	a, err := u.repo.UpdateStatus(ctx, id, userID, req.Status)
+func (u *ApplicationUsecase) GetApplication(ctx context.Context, id, userID int64, userTZ string) (dto.ApplicationResponse, error) {
+	a, err := u.repo.GetByID(ctx, id, userID)
 	if err != nil {
 		return dto.ApplicationResponse{}, wrapNotFound(err)
 	}
 	return mapper.ToApplicationResponse(a, userTZ), nil
 }
 
-func (u *ApplicationUsecase) ToggleArchive(ctx context.Context, id, userID int64, isArchived bool) error {
-	if err := u.repo.SetArchived(ctx, id, userID, isArchived); err != nil {
-		return wrapNotFound(err)
+func validateCreateRequest(req dto.CreateApplicationRequest) error {
+	status := req.Status
+	if status == "" {
+		status = "applied"
+	}
+
+	if req.AppliedDate != nil && status != "wishlist" {
+		t, err := time.Parse("2006-01-02", *req.AppliedDate)
+		if err == nil && t.After(time.Now().UTC()) {
+			return utils.ErrUnprocessable("validation failed", []utils.FieldError{
+				{Field: "applied_date", Message: "cannot be in the future"},
+			})
+		}
 	}
 	return nil
 }
 
-func (u *ApplicationUsecase) CreateEvent(ctx context.Context, applicationID, userID int64, userTZ string, req dto.CreateEventRequest) (dto.EventResponse, error) {
-	if _, err := u.repo.GetByID(ctx, applicationID, userID); err != nil {
-		return dto.EventResponse{}, utils.ErrNotFound("application not found")
+func wrapNotFound(err error) error {
+	if errors.Is(err, appRepo.ErrNotFound) {
+		return utils.ErrNotFound("application not found")
 	}
-
-	eventAt, err := time.Parse(time.RFC3339, req.EventAt)
-	if err != nil {
-		return dto.EventResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
-			{Field: "event_at", Message: "must be a valid RFC 3339 datetime"},
-		})
-	}
-
-	var remindAt *time.Time
-	if req.RemindAt != nil {
-		t, parseErr := time.Parse(time.RFC3339, *req.RemindAt)
-		if parseErr != nil {
-			return dto.EventResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
-				{Field: "remind_at", Message: "must be a valid RFC 3339 datetime"},
-			})
-		}
-		if !t.After(time.Now().UTC()) {
-			return dto.EventResponse{}, utils.ErrUnprocessable("validation failed", []utils.FieldError{
-				{Field: "remind_at", Message: "must be in the future"},
-			})
-		}
-		remindAt = &t
-	}
-
-	e := entity.ApplicationEvent{
-		ApplicationID: applicationID,
-		UserID:        userID,
-		Type:          req.Type,
-		Title:         req.Title,
-		EventAt:       eventAt.UTC(),
-		Notes:         req.Notes,
-		RemindAt:      remindAt,
-	}
-
-	if err := u.eventRepo.InsertEvent(ctx, &e); err != nil {
-		return dto.EventResponse{}, utils.ErrInternal(err)
-	}
-
-	return mapper.ToEventResponse(e, userTZ), nil
+	return utils.ErrInternal(err)
 }
